@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: number-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: number-api
+  template:
+    metadata:
+      labels:
+        app: number-api
+    spec:
+      containers:
+      - name: number-api
+        image: gcr.io/parabolic-hook-437914-f3/number-api:v1
+        ports:
+        - containerPort: 8080
