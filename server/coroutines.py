@@ -1,18 +1,23 @@
 import asyncio
 import time
-from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor, Future
 from queue import PriorityQueue
 import requests
 from typing import Tuple, Optional
 
-
-job_id_t = int
-JobData = namedtuple("JobData", ["job_id", "mail1", "mail2", "url", "period", "window"])
+from common import JobData, job_id_t
 
 
 deleted_jobs_cache = set()
 deleted_jobs_lock = asyncio.Lock()
+
+
+async def delete_job(job_id: job_id_t) -> bool:
+    async with deleted_jobs_lock:
+        if job_id in deleted_jobs_cache:
+            deleted_jobs_cache.remove(job_id)
+            return True
+    return False
 
 
 async def pinging_job(job_data: JobData):
@@ -44,7 +49,12 @@ async def pinging_job(job_data: JobData):
         if tmp is not None:
             if time.time_ns() - tmp[0] >= job_data.window:
                 # todo: email logic and exit
-                pass
+                print(f"no response!!!!!! {job_data.job_id=}")
+                return
             futures.put(tmp)
 
         await asyncio.sleep(job_data.period / 1000)
+
+
+async def new_job(job_data: JobData):
+    asyncio.run(pinging_job(job_data))
