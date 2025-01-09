@@ -1,0 +1,5 @@
+flask
+psycopg2
+flasgger
+aiohttp
+google-api-python-client
