@@ -22,7 +22,7 @@ db_conn = db_access.setup_connection(DB_HOST, DB_PORT)
 def add_service():
     json = request.get_json()
     try:
-        url = json['url'],
+        url = json['url']
         mail1 = json['primary_email']
         mail2 = json['secondary_email']
         period = json['period']
@@ -40,8 +40,8 @@ def add_service():
         job_id = db_access.save_job(job_data, db_conn)
     except Exception as e:
         return Response(dumps({'error': str(e)}), status=500, mimetype='application/json')
-    job_data = JobData(job_id, mail1, mail2, job_id, period, alerting_window, response_time)
-    new_job(job_data)
+    job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time)
+    asyncio.create_task(new_job(job_data))
 
     return Response(dumps({'success': True}), status=200, mimetype='application/json')
 
@@ -75,7 +75,7 @@ def del_job():
         db_access.delete_job(job_id, db_conn)
     except Exception as e:
         return Response(dumps({'error': str(e)}), status=500, mimetype='application/json')
-    asyncio.run(delete_job(job_id))
+    asyncio.create_task(delete_job(job_id))
     return Response(dumps({'success': True}), status=200, mimetype='application/json')
 
 

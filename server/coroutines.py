@@ -28,6 +28,7 @@ async def pinging_job(job_data: JobData):
 
     executor = ThreadPoolExecutor(max_workers=1)
     futures: PriorityQueue[Tuple[int, Future]] = PriorityQueue()
+    failed_packets = set()
     while True:
         async with deleted_jobs_lock:
             if job_data.job_id in deleted_jobs_cache:
@@ -40,21 +41,33 @@ async def pinging_job(job_data: JobData):
         latest = -1
         for (t, ftr) in futures.queue:
             if ftr.done():
-                latest = max(latest, t)
+                resp = ftr.result()
+                if 200 <= resp.status_code < 300:
+                    latest = max(latest, t)
+                else:
+                    failed_packets.add(t)
 
         tmp: Optional[Tuple[int, Future]] = None
-        while not futures.empty() and (tmp := futures.get())[0] <= latest:
-            pass
+
+        while True:
+            if futures.empty():
+                tmp = None
+                break
+            tmp = futures.get()
+            if tmp[0] <= latest or tmp[0] in failed_packets:
+                continue
+            futures.put(tmp)
+            break
 
         if tmp is not None:
-            if time.time_ns() - tmp[0] >= job_data.window:
+            print(tmp[0])
+            if (time.time_ns() - tmp[0]) / 1_000_000 >= job_data.window:
                 # todo: email logic and exit
                 print(f"no response!!!!!! {job_data.job_id=}")
                 return
-            futures.put(tmp)
 
         await asyncio.sleep(job_data.period / 1000)
 
 
 async def new_job(job_data: JobData):
-    asyncio.run(pinging_job(job_data))
+    await pinging_job(job_data)
