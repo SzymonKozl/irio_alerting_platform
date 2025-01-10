@@ -69,12 +69,10 @@ async def del_job(request: web.Request):
     return web.json_response({'success': True}, status=200)
 
 
-# Create the app and add routes
 app = web.Application()
 app.router.add_post('/add_service', add_service)
 app.router.add_get('/alerting_jobs', get_alerting_jobs)
 app.router.add_delete('/del_job', del_job)
 
-# Run the server
 if __name__ == '__main__':
     web.run_app(app, host='127.0.0.1', port=5000)

@@ -13,19 +13,19 @@ deleted_jobs_lock = asyncio.Lock()
 
 async def delete_job(job_id: job_id_t) -> bool:
     async with deleted_jobs_lock:
-        if job_id in deleted_jobs_cache:
-            deleted_jobs_cache.remove(job_id)
-            return True
+        deleted_jobs_cache.add(job_id)
     return False
 
 
 async def pinging_job(job_data: JobData):
 
     async def single_request():
-        async with ClientSession() as session:
-            async with session.get(job_data.url) as response:
-                print(len(await response.text()))
-                return response
+        try:
+            async with ClientSession() as session:
+                async with session.get(job_data.url) as response:
+                    return response
+        except:
+            return None
 
     futures: PriorityQueue[Tuple[int, asyncio.Task]] = PriorityQueue()
     failed_packets = set()
@@ -37,17 +37,15 @@ async def pinging_job(job_data: JobData):
 
         task = asyncio.create_task(single_request())
         futures.put((time.time_ns(), task))
-        print("scheduled request")
 
         latest = -1
         for (t, ftr) in futures.queue:
             if ftr.done():
                 resp = ftr.result()
-                if 200 <= resp.status < 300:
+                if resp is not None and 200 <= resp.status < 300:
                     latest = max(latest, t)
                 else:
                     failed_packets.add(t)
-        print('latest response is ', latest)
 
         tmp: Optional[Tuple[int, asyncio.Task]] = None
 
@@ -61,18 +59,13 @@ async def pinging_job(job_data: JobData):
             futures.put(tmp)
             break
 
-        print(f'{tmp=}')
-
         if tmp is not None:
-            print(tmp[0])
             if (time.time_ns() - tmp[0]) / 1_000_000 >= job_data.window:
                 # todo: email logic and exit
                 print(f"no response!!!!!! {job_data.job_id=}")
                 return
 
-        print('sleeping ', job_data.period / 1000)
         await asyncio.sleep(job_data.period / 1000)
-        print('finished sleeping ', job_data.period / 1000)
 
 
 async def new_job(job_data: JobData):

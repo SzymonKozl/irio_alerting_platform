@@ -30,7 +30,7 @@ def delete_job(job_id: job_id_t, conn: psycopg2.extensions.connection) -> None:
     cursor = conn.cursor()
     cursor.execute(
         f"""
-        DELETE FROM jobs WHERE id = %s;
+        DELETE FROM jobs WHERE job_id = %s;
         """,
         (job_id,)
     )
