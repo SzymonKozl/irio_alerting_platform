@@ -1,16 +1,9 @@
+from aiohttp import web
 import asyncio
-from json import dumps
-
-from flask import Flask, request, Response
-from flasgger import Swagger
 
 from common import *
 import db_access
 from coroutines import delete_job, new_job
-
-
-app = Flask(__name__)
-swagger = Swagger(app)
 
 DB_HOST = 'localhost'
 DB_PORT = 5432
@@ -18,9 +11,8 @@ DB_PORT = 5432
 db_conn = db_access.setup_connection(DB_HOST, DB_PORT)
 
 
-@app.route('/add_service', methods=['POST'])
-def add_service():
-    json = request.get_json()
+async def add_service(request: web.Request):
+    json = await request.json()
     try:
         url = json['url']
         mail1 = json['primary_email']
@@ -29,55 +21,60 @@ def add_service():
         alerting_window = json['alerting_window']
         response_time = json['response_time']
     except KeyError as e:
-        return Response(dumps({'error': str(e)}), status=400, mimetype='application/json')
+        return web.json_response({'error': str(e)}, status=400)
     if not isinstance(period, int) or not isinstance(alerting_window, int) or not isinstance(response_time, int):
-        return Response(dumps({'error': ERR_MSG_CREATE_POSITIVE_INT}), status=400, mimetype='application/json')
+        return web.json_response({'error': ERR_MSG_CREATE_POSITIVE_INT}, status=400)
     if period <= 0 or alerting_window <= 0 or response_time <= 0:
-        return Response(dumps({'error': ERR_MSG_CREATE_POSITIVE_INT}), status=400, mimetype='application/json')
+        return web.json_response({'error': ERR_MSG_CREATE_POSITIVE_INT}, status=400)
 
     job_data = JobData(-1, mail1, mail2, url ,period, alerting_window, response_time)
     try:
         job_id = db_access.save_job(job_data, db_conn)
     except Exception as e:
-        return Response(dumps({'error': str(e)}), status=500, mimetype='application/json')
+        return web.json_response({'error': str(e)}, status=500)
     job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time)
     asyncio.create_task(new_job(job_data))
 
-    return Response(dumps({'success': True}), status=200, mimetype='application/json')
+    return web.json_response({'success': True}, status=200)
 
 
-@app.route('/alerting_jobs', methods=['GET'])
-def get_alerting_jobs():
-    json = request.get_json()
+async def get_alerting_jobs(request: web.Request):
+    json = await request.json()
     try:
         mail1 = json['primary_email']
     except KeyError as e:
-        return Response(dumps({'error': str(e)}), status=400, mimetype='application/json')
+        return web.json_response({'error': str(e)}, status=400)
 
     try:
         jobs = db_access.get_jobs(mail1, db_conn)
     except Exception as e:
-        return Response(dumps({'error': str(e)}), status=500, mimetype='application/json')
+        return web.json_response({'error': str(e)}, status=500)
     resp = {"jobs": []}
     for job in jobs:
         resp["jobs"].append(job._asdict())
-    return Response(dumps(resp), status=200, mimetype='application/json')
+    return web.json_response(resp, status=200)
 
 
-@app.route('/del_job', methods=['DELETE'])
-def del_job():
-    json = request.get_json()
+async def del_job(request: web.Request):
+    json = await request.json()
     try:
         job_id = json['job_id']
     except KeyError as e:
-        return Response(dumps({'error': str(e)}), status=400, mimetype='application/json')
+        return web.json_response({'error': str(e)}, status=400)
     try:
         db_access.delete_job(job_id, db_conn)
     except Exception as e:
-        return Response(dumps({'error': str(e)}), status=500, mimetype='application/json')
+        return web.json_response({'error': str(e)}, status=500)
     asyncio.create_task(delete_job(job_id))
-    return Response(dumps({'success': True}), status=200, mimetype='application/json')
+    return web.json_response({'success': True}, status=200)
 
 
+# Create the app and add routes
+app = web.Application()
+app.router.add_post('/add_service', add_service)
+app.router.add_get('/alerting_jobs', get_alerting_jobs)
+app.router.add_delete('/del_job', del_job)
+
+# Run the server
 if __name__ == '__main__':
-    app.run(debug=True)
+    web.run_app(app, host='127.0.0.1', port=5000)
