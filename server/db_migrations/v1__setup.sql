@@ -5,5 +5,6 @@ CREATE TABLE jobs (
     url varchar(511) not null,
     period INT not null,
     alerting_window INT not null,
-    response_time INT not null
+    response_time INT not null,
+    stateful_set_index INT not null
 );

@@ -37,14 +37,14 @@ def delete_job(job_id: job_id_t, conn: psycopg2.extensions.connection) -> None:
     conn.commit()
 
 
-def save_job(job: JobData, conn: psycopg2.extensions.connection) -> job_id_t:
+def save_job(job: JobData, conn: psycopg2.extensions.connection, set_idx: int) -> job_id_t:
     cursor = conn.cursor()
     cursor.execute(
         f"""
-        INSERT INTO jobs VALUES (DEFAULT, %s, %s, %s, %s, %s, %s)
+        INSERT INTO jobs VALUES (DEFAULT, %s, %s, %s, %s, %s, %s, %s)
         RETURNING job_id;
         """,
-        (job.mail1, job.mail2, job.url, job.period, job.window, job.response_time)
+        (job.mail1, job.mail2, job.url, job.period, job.window, job.response_time, set_idx)
     )
     conn.commit()
     return job_id_t(cursor.fetchone()[0])

@@ -28,7 +28,6 @@ async def pinging_job(job_data: JobData):
             return None
 
     futures: PriorityQueue[Tuple[int, asyncio.Task]] = PriorityQueue()
-    failed_packets = set()
     while True:
         async with deleted_jobs_lock:
             if job_data.job_id in deleted_jobs_cache:
@@ -44,8 +43,6 @@ async def pinging_job(job_data: JobData):
                 resp = ftr.result()
                 if resp is not None and 200 <= resp.status < 300:
                     latest = max(latest, t)
-                else:
-                    failed_packets.add(t)
 
         tmp: Optional[Tuple[int, asyncio.Task]] = None
 
@@ -54,7 +51,7 @@ async def pinging_job(job_data: JobData):
                 tmp = None
                 break
             tmp = futures.get()
-            if tmp[0] <= latest or tmp[0] in failed_packets:
+            if tmp[0] <= latest:
                 continue
             futures.put(tmp)
             break

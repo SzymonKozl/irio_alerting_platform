@@ -8,6 +8,8 @@ from coroutines import delete_job, new_job
 DB_HOST = 'localhost'
 DB_PORT = 5432
 
+STATEFUL_SET_INDEX = 1 # todo: set to real value
+
 db_conn = db_access.setup_connection(DB_HOST, DB_PORT)
 
 
@@ -29,7 +31,7 @@ async def add_service(request: web.Request):
 
     job_data = JobData(-1, mail1, mail2, url ,period, alerting_window, response_time)
     try:
-        job_id = db_access.save_job(job_data, db_conn)
+        job_id = db_access.save_job(job_data, db_conn, STATEFUL_SET_INDEX)
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
     job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time)
