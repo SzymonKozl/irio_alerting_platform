@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: number-api-service
+  name: alerting-app-service
 spec:
   type: LoadBalancer
   ports:
   - port: 80
     targetPort: 8080
   selector:
-    app: number-api
+    app: alerting-app

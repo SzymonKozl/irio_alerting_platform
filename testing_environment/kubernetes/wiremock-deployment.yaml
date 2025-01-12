@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-http-service
+  namespace: testing
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mock-http-service
+  template:
+    metadata:
+      labels:
+        app: mock-http-service
+    spec:
+      containers:
+        - name: wiremock
+          image: wiremock/wiremock:latest
+          ports:
+            - containerPort: 8080
+

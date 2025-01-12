@@ -1,19 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: number-api
+  name: alerting-app
+  namespace: testing
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: number-api
+      app: alerting-app
   template:
     metadata:
       labels:
-        app: number-api
+        app: alerting-app
     spec:
       containers:
-      - name: number-api
+      - name: alerting-app
         image: gcr.io/parabolic-hook-437914-f3/number-api:v1
         ports:
         - containerPort: 8080
