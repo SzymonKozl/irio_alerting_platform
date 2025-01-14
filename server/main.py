@@ -5,9 +5,6 @@ from common import *
 import db_access
 from coroutines import delete_job, new_job
 
-DB_HOST = 'localhost'
-DB_PORT = 5432
-
 STATEFUL_SET_INDEX = 1 # todo: set to real value
 
 db_conn = db_access.setup_connection(DB_HOST, DB_PORT)
@@ -36,6 +33,24 @@ async def add_service(request: web.Request):
         return web.json_response({'error': str(e)}, status=500)
     job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time)
     asyncio.create_task(new_job(job_data))
+
+    return web.json_response({'success': True}, status=200)
+
+
+async def receive_alert(request: web.Request):
+    json = await request.json()
+
+    try:
+        notification_id = json['notification_id']
+        primary_admin = json['primary_admin']
+        # DOZRO: validation
+    except KeyError as e:
+        return web.json_response({'error': str(e)}, status=400)
+
+    try:
+        db_access.update_notification_response_status(notification_id, primary_admin, db_conn)
+    except Exception as e:
+        return web.json_response({'error': str(e)}, status=500)
 
     return web.json_response({'success': True}, status=200)
 
@@ -73,8 +88,9 @@ async def del_job(request: web.Request):
 
 app = web.Application()
 app.router.add_post('/add_service', add_service)
+app.router.add_post('/receive_alert', receive_alert)
 app.router.add_get('/alerting_jobs', get_alerting_jobs)
 app.router.add_delete('/del_job', del_job)
 
 if __name__ == '__main__':
-    web.run_app(app, host='127.0.0.1', port=5000)
+    web.run_app(app, host=APP_HOST, port=APP_PORT)

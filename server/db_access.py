@@ -3,7 +3,7 @@ from typing import Optional, List
 
 import psycopg2
 
-from common import JobData, job_id_t
+from common import JobData, job_id_t, NotificationData, notification_id_t
 
 
 def setup_connection(db_host: str, db_port: int) -> Optional[psycopg2.extensions.connection]:
@@ -64,3 +64,63 @@ def get_jobs(primary_email: str, conn: psycopg2.extensions.connection) -> List[J
     for row in rows:
         jobs.append(JobData(row[0], row[1], row[2], row[3], row[4], row[5], row[6]))
     return jobs
+
+
+def delete_notification(notification_id: int, conn: psycopg2.extensions.connection) -> None:
+    cursor = conn.cursor()
+    cursor.execute(
+        f"""
+        DELETE FROM notifications WHERE notification_id = %s;
+        """,
+        (notification_id,)
+    )
+    conn.commit()
+
+
+def save_notification(notification: NotificationData, conn: psycopg2.extensions.connection) -> notification_id_t:
+    cursor = conn.cursor()
+    cursor.execute(
+        f"""
+        INSERT INTO notifications VALUES (DEFAULT, %s, %s, %s)
+        RETURNING notification_id;
+        """,
+        (notification.timestamp, notification.primary_admin_responded, notification.secondary_admin_responded)
+    )
+    conn.commit()
+    return notification_id_t(cursor.fetchone()[0])
+
+
+def notification_admin_response_status(notification_id: int, primary_admin: bool, conn: psycopg2.extensions.connection) -> bool:
+    cursor = conn.cursor()
+    cursor.execute(
+        f"""
+        SELECT * FROM notifications WHERE notification_id = %s;
+        """,
+        (notification_id,)
+    )
+
+    if primary_admin:
+        return cursor.fetchone()[2]
+    else:
+        return cursor.fetchone()[3]
+
+
+def update_notification_response_status(notification_id: int, primary_admin: bool, conn: psycopg2.extensions.connection) -> None:
+    cursor = conn.cursor()
+
+    if primary_admin:
+        cursor.execute(
+            f"""
+            UPDATE notifications SET primary_admin_responded = TRUE WHERE notification_id = %s;
+            """,
+            (notification_id,)
+        )
+    else:
+        cursor.execute(
+            f"""
+            UPDATE notifications SET secondary_admin_responded = TRUE WHERE notification_id = %s;
+            """,
+            (notification_id,)
+        )
+
+    conn.commit()
