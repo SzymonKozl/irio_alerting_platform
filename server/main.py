@@ -38,11 +38,10 @@ async def add_service(request: web.Request):
 
 
 async def receive_alert(request: web.Request):
-    json = await request.json()
-
     try:
-        notification_id = json['notification_id']
-        primary_admin = json['primary_admin']
+        # Not using json here, because we want to send a link through email
+        notification_id = request.query['notification_id']
+        primary_admin = request.query['primary_admin']
         # DOZRO: validation
     except KeyError as e:
         return web.json_response({'error': str(e)}, status=400)

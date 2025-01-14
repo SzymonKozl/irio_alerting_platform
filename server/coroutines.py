@@ -2,6 +2,7 @@ import asyncio
 import time
 import smtplib
 import os
+import threading
 from queue import PriorityQueue
 from aiohttp import ClientSession
 from typing import Tuple, Optional
@@ -25,7 +26,7 @@ smtp_password = os.environ.get('SMTP_PASSWORD')
 smtp = smtplib.SMTP(smtp_server, smtp_port)
 smtp.starttls()
 smtp.login(smtp_username, smtp_password)
-smtp_lock = asyncio.Lock()
+smtp_lock = threading.Lock()
 
 
 def send_email(to: str, subject: str, body: str):
@@ -38,6 +39,13 @@ def send_email(to: str, subject: str, body: str):
             smtp.sendmail(smtp_username, to, msg.as_string())
     except Exception as e:
         print(f"Error sending email: {e}")
+
+
+def send_alert(to: str, url: str, notification_id: int, primary_admin: bool):
+    link = f"http://{APP_HOST}:{APP_PORT}/receive_alert?notification_id={notification_id}&primary_admin={primary_admin}"
+    subject = "Alert"
+    body = f"Alert for {url}. Click {link} to acknowledge."
+    send_email(to, subject, body)
 
 
 async def delete_job(job_id: job_id_t) -> bool:
@@ -93,21 +101,17 @@ async def pinging_job(job_data: JobData):
                     notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, False), conn)
                     db_access.delete_job(job_data.job_id, conn)
 
-                    print("Alerting 1")
-                    print(notification_id)
+                    send_alert(job_data.mail1, job_data.url, notification_id, True)
 
                     await asyncio.sleep(job_data.response_time / 1000)
 
                     if not db_access.notification_admin_response_status(notification_id, True, conn):
-                        print("Alerting 2")
+                        send_alert(job_data.mail2, job_data.url, notification_id, False)
 
                         await asyncio.sleep(job_data.response_time / 1000)
 
                         # Check if the secondary admin has responded and log the result
                             
-                    else:
-                        print("ACK")
-
                     db_access.delete_notification(notification_id, conn)
                 finally:
                     conn.close()
