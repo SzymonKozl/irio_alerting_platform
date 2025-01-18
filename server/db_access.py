@@ -84,13 +84,13 @@ def save_notification(notification: NotificationData, conn: psycopg2.extensions.
         INSERT INTO notifications VALUES (DEFAULT, %s, %s, %s)
         RETURNING notification_id;
         """,
-        (notification.timestamp, notification.primary_admin_responded, notification.secondary_admin_responded)
+        (notification.time_sent, notification.primary_admin_responded, notification.secondary_admin_responded)
     )
     conn.commit()
     return notification_id_t(cursor.fetchone()[0])
 
 
-def notification_admin_response_status(notification_id: int, primary_admin: bool, conn: psycopg2.extensions.connection) -> bool:
+def get_notification_by_id(notification_id: int, conn: psycopg2.extensions.connection) -> NotificationData:
     cursor = conn.cursor()
     cursor.execute(
         f"""
@@ -99,10 +99,7 @@ def notification_admin_response_status(notification_id: int, primary_admin: bool
         (notification_id,)
     )
 
-    if primary_admin:
-        return cursor.fetchone()[2]
-    else:
-        return cursor.fetchone()[3]
+    return NotificationData(*cursor.fetchone())
 
 
 def update_notification_response_status(notification_id: int, primary_admin: bool, conn: psycopg2.extensions.connection) -> None:
