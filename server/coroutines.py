@@ -104,7 +104,7 @@ async def pinging_job(job_data: JobData):
 
                     await asyncio.sleep(job_data.response_time / 1000)
 
-                    if not db_access.notification_admin_response_status(notification_id, True, conn):
+                    if not db_access.get_notification_by_id(notification_id, conn).primary_admin_responded:
                         send_alert(job_data.mail2, job_data.url, notification_id, False)
 
                         await asyncio.sleep(job_data.response_time / 1000)
