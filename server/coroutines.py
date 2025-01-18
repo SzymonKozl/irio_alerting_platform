@@ -14,7 +14,6 @@ import db_access
 from common import *
 
 
-# Maybe an explicit init function would be better
 deleted_jobs_cache = set()
 deleted_jobs_lock = asyncio.Lock()
 
@@ -23,9 +22,12 @@ smtp_port = 587
 smtp_username = os.environ.get('SMTP_USERNAME')
 smtp_password = os.environ.get('SMTP_PASSWORD')
 smtp = smtplib.SMTP(smtp_server, smtp_port)
-smtp.starttls()
-smtp.login(smtp_username, smtp_password)
 smtp_lock = threading.Lock()
+
+
+def init_smtp():
+    smtp.starttls()
+    smtp.login(smtp_username, smtp_password)
 
 
 def send_email(to: str, subject: str, body: str):
