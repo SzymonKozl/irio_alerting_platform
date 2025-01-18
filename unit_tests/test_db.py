@@ -129,7 +129,7 @@ def test_db_access_save_notification(postgresql):
 
     notification = NotificationData(
         notification_id=-1,
-        timestamp=datetime.now(),
+        time_sent=datetime.now(),
         primary_admin_responded=False,
         secondary_admin_responded=False
     )
@@ -143,3 +143,57 @@ def test_db_access_save_notification(postgresql):
     assert result is not None
     assert result[0] == notification_id
 
+
+def test_db_access_get_notification_by_id(postgresql):
+    setup_db(postgresql)
+
+    cursor = postgresql.cursor()
+    cursor.execute("INSERT INTO notifications VALUES (0, CURRENT_TIMESTAMP, FALSE, FALSE);")
+    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, TRUE);")
+    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, FALSE);")
+    postgresql.commit()
+
+    notification = db_access.get_notification_by_id(1, postgresql)
+
+    assert notification.primary_admin_responded == True
+    assert notification.secondary_admin_responded == True
+
+
+def test_db_access_udate_notification_response_status1(postgresql):
+    setup_db(postgresql)
+
+    notification_id = 0
+
+    cursor = postgresql.cursor()
+    cursor.execute(f"INSERT INTO notifications VALUES ({notification_id}, CURRENT_TIMESTAMP, FALSE, FALSE);")
+    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, TRUE);")
+    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, FALSE);")
+    postgresql.commit()
+
+    db_access.update_notification_response_status(notification_id, True, postgresql)
+
+    cursor.execute(f"SELECT primary_admin_responded FROM notifications WHERE notification_id = {notification_id};")
+    result = cursor.fetchone()
+
+    assert result is not None
+    assert result[0] == True
+
+
+def test_db_access_udate_notification_response_status2(postgresql):
+    setup_db(postgresql)
+
+    notification_id = 0
+
+    cursor = postgresql.cursor()
+    cursor.execute(f"INSERT INTO notifications VALUES ({notification_id}, CURRENT_TIMESTAMP, FALSE, FALSE);")
+    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, TRUE);")
+    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, FALSE);")
+    postgresql.commit()
+
+    db_access.update_notification_response_status(notification_id, False, postgresql)
+
+    cursor.execute(f"SELECT secondary_admin_responded FROM notifications WHERE notification_id = {notification_id};")
+    result = cursor.fetchone()
+
+    assert result is not None
+    assert result[0] == True
