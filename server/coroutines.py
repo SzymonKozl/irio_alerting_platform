@@ -7,7 +7,6 @@ from queue import PriorityQueue
 from aiohttp import ClientSession
 from typing import Tuple, Optional
 from email.mime.text import MIMEText
-from dotenv import load_dotenv
 from datetime import datetime
 
 

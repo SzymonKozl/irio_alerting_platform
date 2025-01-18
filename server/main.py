@@ -40,10 +40,11 @@ async def add_service(request: web.Request):
 async def receive_alert(request: web.Request):
     try:
         # Not using json here, because we want to send a link through email
-        notification_id = request.query['notification_id']
-        primary_admin = request.query['primary_admin']
-        # DOZRO: validation
+        notification_id = int(request.query['notification_id'])
+        primary_admin = request.query['primary_admin'].lower() == 'true'
     except KeyError as e:
+        return web.json_response({'error': str(e)}, status=400)
+    except ValueError as e:
         return web.json_response({'error': str(e)}, status=400)
 
     try:
@@ -87,7 +88,7 @@ async def del_job(request: web.Request):
 
 app = web.Application()
 app.router.add_post('/add_service', add_service)
-app.router.add_post('/receive_alert', receive_alert)
+app.router.add_get('/receive_alert', receive_alert)
 app.router.add_get('/alerting_jobs', get_alerting_jobs)
 app.router.add_delete('/del_job', del_job)
 
