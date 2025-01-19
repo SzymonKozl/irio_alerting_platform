@@ -65,7 +65,6 @@ class MailServer:
         info("Mail server stopped.")
 
 
-
 class MockServiceHandle:
     def __init__(self, port):
         self.port = port
@@ -100,7 +99,7 @@ class MockServiceHandle:
 class PingingJob:
     mail1: str
     mail2: str
-    period: str
+    period: int
     url: str | MockServiceHandle
     alerting_window: int
     response_time: int
@@ -118,9 +117,10 @@ class AlertingServiceHandle:
             subprocess.run(["python", "repo/server/main.py", "localhost", str(self.port)])
             exit(0)
 
+
     def add_pinging_job(self, job_data: PingingJob) -> int:
         payload = {
-            "url": job_data.url,
+            "url": job_data.url if isinstance(job_data.url, str) else job_data.url.port,
             "alerting_window": job_data.alerting_window,
             "period": job_data.period,
             "primary_email": job_data.mail1,
