@@ -8,3 +8,10 @@ CREATE TABLE jobs (
     response_time INT not null,
     stateful_set_index INT not null
 );
+
+CREATE TABLE notifications (
+    notification_id SERIAL PRIMARY KEY not null,
+    time_sent timestamp not null,
+    primary_admin_responded BOOLEAN DEFAULT FALSE,
+    secondary_admin_responded BOOLEAN DEFAULT FALSE
+);

@@ -3,10 +3,7 @@ import asyncio
 
 from common import *
 import db_access
-from coroutines import delete_job, new_job
-
-DB_HOST = 'localhost'
-DB_PORT = 5432
+from coroutines import delete_job, new_job, init_smtp
 
 STATEFUL_SET_INDEX = 1 # todo: set to real value
 
@@ -36,6 +33,24 @@ async def add_service(request: web.Request):
         return web.json_response({'error': str(e)}, status=500)
     job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time)
     asyncio.create_task(new_job(job_data))
+
+    return web.json_response({'success': True}, status=200)
+
+
+async def receive_alert(request: web.Request):
+    try:
+        # Not using json here, because we want to send a link through email
+        notification_id = int(request.query['notification_id'])
+        primary_admin = request.query['primary_admin'].lower() == 'true'
+    except KeyError as e:
+        return web.json_response({'error': str(e)}, status=400)
+    except ValueError as e:
+        return web.json_response({'error': str(e)}, status=400)
+
+    try:
+        db_access.update_notification_response_status(notification_id, primary_admin, db_conn)
+    except Exception as e:
+        return web.json_response({'error': str(e)}, status=500)
 
     return web.json_response({'success': True}, status=200)
 
@@ -73,8 +88,14 @@ async def del_job(request: web.Request):
 
 app = web.Application()
 app.router.add_post('/add_service', add_service)
+app.router.add_get('/receive_alert', receive_alert)
 app.router.add_get('/alerting_jobs', get_alerting_jobs)
 app.router.add_delete('/del_job', del_job)
 
 if __name__ == '__main__':
-    web.run_app(app, host='127.0.0.1', port=5000)
+    try:
+        init_smtp()
+    except Exception as e:
+          print(f"Error initializing smtp connection: {e}")
+
+    web.run_app(app, host=APP_HOST, port=APP_PORT)
