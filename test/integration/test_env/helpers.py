@@ -4,7 +4,7 @@ import os
 import subprocess
 import requests
 from sys import exit
-from log import *
+from test_env.log import *
 
 import threading
 from aiosmtpd.controller import Controller
