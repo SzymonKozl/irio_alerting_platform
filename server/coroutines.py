@@ -17,7 +17,8 @@ from common import *
 deleted_jobs_cache = set()
 deleted_jobs_lock = asyncio.Lock()
 
-smtp_server = 'smtp.gmail.com'
+smtp_server = os.environ.get("SMTP_SERVER")
+smtp_server = 'smtp.gmail.com' if smtp_server is None else smtp_server
 smtp_port = 587
 smtp_username = os.environ.get('SMTP_USERNAME')
 smtp_password = os.environ.get('SMTP_PASSWORD')
