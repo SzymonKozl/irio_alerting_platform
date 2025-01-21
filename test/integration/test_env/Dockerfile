@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 # non interactive postgres installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -16,7 +16,7 @@ RUN git clone $REPO_URL repo
 WORKDIR repo
 RUN git checkout origin/test/integration
 
-#move to tests dir
+# move to tests dir
 WORKDIR test/integration/test_env
 RUN pip install -r requirements.txt
 
