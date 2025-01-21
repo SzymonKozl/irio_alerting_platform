@@ -37,9 +37,11 @@ ENV POSTGRES_PORT="5432"
 # SMTP credentials
 ARG SMTP_USERNAME=""
 ARG SMTP_PASSWORD=""
+ARG SMTP_SERVER=""
 
 ENV SMTP_USERNAME=$SMTP_USERNAME
 ENV SMTP_PASSWORD=$SMTP_PASSWORD
+ENV SMTP_SERVER=$SMTP_SERVER
 
 # install alerting platform dependencties
 RUN pip install -r ../../../server/requirements.txt
