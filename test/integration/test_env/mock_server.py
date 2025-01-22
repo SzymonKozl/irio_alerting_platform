@@ -1,7 +1,9 @@
 from asyncio import sleep
 
 from aiohttp import web
+from aiohttp.web import GracefulExit
 from sys import argv, exit, stderr
+import signal
 
 
 response_mode = 'normal'
@@ -13,7 +15,7 @@ def panic(where: str, reason: str) -> None:
     stderr.write(f"{where}\n")
     stderr.write("reason:\n")
     stderr.write(f"{reason}\n")
-    exit(1)
+    raise GracefulExit()
 
 
 async def set_response_mode(request: web.Request) -> web.Response:
@@ -44,6 +46,14 @@ async def pinging_endpoint(request: web.Request) -> web.Response:
 app = web.Application()
 app.router.add_post('/set_response_mode', set_response_mode)
 app.router.add_get('/pinging_endpoint', pinging_endpoint)
+
+
+def handle_SIGTERM(sig, frame):
+    raise GracefulExit()
+
+
+signal.signal(signal.SIGTERM, handle_SIGTERM)
+
 
 if __name__ == '__main__':
     assert len(argv) == 3, "usage: python mock_server.py host port"

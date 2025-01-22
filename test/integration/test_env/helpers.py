@@ -1,3 +1,4 @@
+import signal
 from dataclasses import dataclass
 from typing import List, Optional
 import os
@@ -10,6 +11,9 @@ import threading
 from aiosmtpd.controller import Controller
 from aiosmtpd.handlers import Debugging
 from email.message import EmailMessage
+from email import message_from_bytes, policy
+
+from test_env.log import log_net
 
 
 class SMTPHandler(Debugging):
@@ -21,10 +25,7 @@ class SMTPHandler(Debugging):
     async def handle_DATA(self, server, session, envelope):
         try:
             # Convert raw email bytes to an EmailMessage object
-            email_message = EmailMessage()
-            email_message.set_content(envelope.content.decode('utf-8', errors='replace'))
-            email_message['From'] = envelope.mail_from
-            email_message['To'] = envelope.rcpt_tos[0]
+            email_message = message_from_bytes(envelope.content)
 
             self.collector(email_message)
 
@@ -37,7 +38,20 @@ class SMTPHandler(Debugging):
 
 def save_mail(msg: EmailMessage):
     with open("mail.log", "a") as mail_log:
-        mail_log.write(f"{msg['To']}\n")
+        content = msg.as_string().replace('\n', ' ').replace('\r', ' ')
+        mail_log.write(f"{msg['To']};{content}\n")
+
+
+def scrap_ack_url(mail_content: str) -> str:
+    try:
+        ix1 = mail_content.index("Click") + len("Click")
+        mail_content = mail_content[ix1:]
+        ix2 = mail_content.index(" to acknowledge")
+        mail_content = mail_content[:ix2]
+        return mail_content
+    except Exception as e:
+        error(f"notification id cound not be scrapped from email {e}")
+        return ""
 
 
 class MailServer:
@@ -70,25 +84,32 @@ class MailServer:
         self.thread = None
         info("Mail server stopped.")
 
-    def got_mail_to(self, receiver: str) -> bool:
+    def last_mail_to(self, receiver: str) -> Optional[str]:
+        content = None
         with open("mail.log", "r") as mail_log:
             for line in mail_log:
-                if line.strip() == receiver:
-                    return True
-        return False
+                if line.strip().split(';')[0] == receiver:
+                    content = line.strip().split(';', 1)[1]
+        return content
 
 
 class MockServiceHandle:
     def __init__(self, port):
         self.port = port
         self.log_file = open(f"service={self.port}.log", "w")
+        self.child_pid = -1
         self._create()
         
     def _create(self):
         log_net(info, "Creating...", "mock service", self.port)
-        if os.fork() == 0:
+        self.child_pid = os.fork()
+        if self.child_pid == 0:
             subprocess.run(["python", "test_env/mock_server.py", "localhost", str(self.port)], stdout=self.log_file, stderr=self.log_file)
             exit(0)
+
+    def close(self):
+        self.log_file.close()
+        os.kill(self.child_pid, signal.SIGTERM)
 
     def _set_mode(self, mode: str):
         resp = requests.post(f"http://localhost:{self.port}/set_response_mode?mode={mode}")
@@ -187,3 +208,15 @@ class AlertingServiceHandle:
             return None
         log_net(info, f"get pinging jobs for mail {mail}", self.__class__.__name__, self.port)
         return res
+
+
+    def confirm_alert(self, link: str) -> bool:
+
+        resp = requests.get(link)
+
+        if 200 <= resp.status_code < 300:
+            log_net(info, f"acknowledged alert: {link}", self.__class__.__name__, self.port)
+            return True
+        else:
+            log_net(warn, f"failed to acknowledge alert with link {link}. response code: {resp.status_code}, reponse: {resp.text}", self.__class__.__name__, self.port)
+            return False

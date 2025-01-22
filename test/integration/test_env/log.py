@@ -1,6 +1,7 @@
 from datetime import datetime
 from sys import stdout
 from typing import TextIO
+from os import write
 
 logging_target = stdout
 
@@ -16,7 +17,7 @@ def close_logging_target():
 
 
 def log(message, lvl):
-    print(f"[{lvl}] {datetime.now()}: {message}", file=logging_target)
+    write(logging_target.fileno(), bytes(f"[{lvl}] {datetime.now()}: {message}\n", encoding="utf-8"))
 
 
 def info(message):
