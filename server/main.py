@@ -30,11 +30,11 @@ async def add_service(request: web.Request):
     try:
         job_id = db_access.save_job(job_data, db_conn, STATEFUL_SET_INDEX)
     except Exception as e:
-        return web.json_response({'error': str(e)}, status=500)
+        return web.json_response({'error': str(e)}, status=501)
     job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time)
     asyncio.create_task(new_job(job_data))
 
-    return web.json_response({'success': True}, status=200)
+    return web.json_response({'success': True, 'job_id': job_id}, status=200)
 
 
 async def receive_alert(request: web.Request):

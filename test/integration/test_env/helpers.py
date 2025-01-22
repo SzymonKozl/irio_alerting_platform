@@ -1,3 +1,4 @@
+import queue
 from dataclasses import dataclass
 from typing import List, Optional
 import os
@@ -5,6 +6,7 @@ import subprocess
 import requests
 from sys import exit
 from test_env.log import *
+from time import sleep
 
 import threading
 from aiosmtpd.controller import Controller
@@ -23,25 +25,31 @@ class SMTPHandler(Debugging):
             # Convert raw email bytes to an EmailMessage object
             email_message = EmailMessage()
             email_message.set_content(envelope.content.decode('utf-8', errors='replace'))
-
-            for header, value in envelope.headers:
-                email_message[header] = value
+            email_message['From'] = envelope.mail_from
+            email_message['To'] = envelope.rcpt_tos[0]
 
             self.collector(email_message)
 
-            info(f"Email received: {email_message['Subject']} from {email_message['From']}")
+            info(f"Email received for account: {email_message['To']} from {envelope.mail_from}")
             return '250 OK'
         except Exception as e:
             warn(f"Error handling email: {e}")
             return '451 Internal Server Error'
 
+
+def save_mail(msg: EmailMessage):
+    with open("mail.log", "a") as mail_log:
+        mail_log.write(f"{msg['To']}\n")
+
+
 class MailServer:
-    def __init__(self, host="127.0.0.1", port=1025):
+    def __init__(self, host="localhost", port=587):
         self.host = host
         self.port = port
-        self.messages = []
-        self.controller = Controller(handler=SMTPHandler(lambda msg: self.messages.append(msg)), hostname=self.host, port=self.port)
+        self.controller = Controller(handler=SMTPHandler(save_mail), hostname=self.host, port=self.port)
         self.thread = None
+        self.start()
+
 
     def start(self):
         if self.thread is not None:
@@ -64,16 +72,24 @@ class MailServer:
         self.thread = None
         info("Mail server stopped.")
 
+    def got_mail_to(self, receiver: str) -> bool:
+        with open("mail.log", "r") as mail_log:
+            for line in mail_log:
+                if line.strip() == receiver:
+                    return True
+        return False
+
 
 class MockServiceHandle:
     def __init__(self, port):
         self.port = port
+        self.log_file = open(f"service={self.port}.log", "w")
         self._create()
         
     def _create(self):
         log_net(info, "Creating...", "mock service", self.port)
-        if os.fork() != 0:
-            subprocess.run(["python", "mock_server.py", "localhost", str(self.port)])
+        if os.fork() == 0:
+            subprocess.run(["python", "test_env/mock_server.py", "localhost", str(self.port)], stdout=self.log_file, stderr=self.log_file)
             exit(0)
 
     def _set_mode(self, mode: str):
@@ -111,10 +127,12 @@ def handle_child_death(signum, frame):
 
 
 class AlertingServiceHandle:
-    def __init__(self, port):
-        self.port = port
-        if os.fork() != 0:
-            subprocess.run(["python", "repo/server/main.py", "localhost", str(self.port)])
+    def __init__(self):
+        log_net(info, "Creating...", "alerting service", 5000)
+        self.port = 5000
+        self.log_file = open(f"server.log", "w")
+        if os.fork() == 0:
+            subprocess.run(["python", "../../server/main.py", ">", "server.log"], stdout=self.log_file, stderr=self.log_file)
             exit(0)
 
 
@@ -133,7 +151,7 @@ class AlertingServiceHandle:
             log_net(info, f"added ping job {job_id}", self.__class__.__name__, self.port)
             return job_id
         except (requests.exceptions.JSONDecodeError, KeyError) as e:
-            log_net(warn, f"failed to add ping job. Exception: {type(e).__name__}, reason: {e}", self.__class__.__name__, self.port)
+            log_net(warn, f"failed to add ping job. Exception: {type(e).__name__}, reason: {e}, server_resp: {resp} {resp.json()}", self.__class__.__name__, self.port)
             return -1
 
 
