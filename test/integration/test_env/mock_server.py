@@ -1,5 +1,4 @@
 from asyncio import sleep
-from unittest import case
 
 from aiohttp import web
 from sys import argv, exit, stderr

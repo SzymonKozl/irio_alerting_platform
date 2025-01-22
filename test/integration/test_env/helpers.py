@@ -1,4 +1,3 @@
-import queue
 from dataclasses import dataclass
 from typing import List, Optional
 import os
@@ -6,7 +5,6 @@ import subprocess
 import requests
 from sys import exit
 from test_env.log import *
-from time import sleep
 
 import threading
 from aiosmtpd.controller import Controller
