@@ -153,6 +153,7 @@ if __name__ == '__main__':
     try:
         init_smtp()
     except Exception as e:
-        logging.error("Error initializing smtp connection: %s", e)
+        logging.error("Error initializing SMTP connection: %s", e,
+                      extra={"json_fields" : {"function_name" : "main"}})
 
     web.run_app(app, host=APP_HOST, port=APP_PORT)

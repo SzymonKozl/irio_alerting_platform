@@ -8,6 +8,7 @@ from aiohttp import ClientSession
 from typing import Tuple, Optional
 from email.mime.text import MIMEText
 from datetime import datetime
+import logging
 
 
 import db_access
@@ -28,9 +29,17 @@ smtp_lock = threading.Lock()
 
 
 def init_smtp():
-    smtp.starttls()
-    smtp.login(smtp_username, smtp_password)
-
+    log_data = {"function_name": "init_smtp"}
+    logging.info("Init SMTP called", extra={"json_fields": log_data})
+    
+    try:
+        smtp.starttls()
+        smtp.login(smtp_username, smtp_password)
+    except Exception as e:
+        logging.error("Error initializing SMTP connection: %s", e,
+                      extra={"json_fields": log_data})
+        raise e
+    logging.info("SMTP connection initialized", extra={"json_fields": log_data})
 
 def send_email(to: str, subject: str, body: str):
     msg = MIMEText(body)
