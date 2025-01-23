@@ -3,12 +3,11 @@ from aiohttp.web_runner import GracefulExit
 import asyncio
 import signal
 import os, sys
+import logging
 
 from common import *
 import db_access
 from coroutines import delete_job, new_job, init_smtp
-
-import logging
 from logging_setup import setup_logging
 
 STATEFUL_SET_INDEX = 1 # todo: set to real value
@@ -109,16 +108,24 @@ async def get_alerting_jobs(request: web.Request):
 
 
 async def del_job(request: web.Request):
+    log_data = {"function_name" : "del_job"}
+    logging.info("Delete job request received", extra={"json_fields" : log_data})
+
     json = await request.json()
     try:
         job_id = json['job_id']
     except KeyError as e:
+        logging.error("Missing key in request: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
+        
+    log_data["job_id"] = job_id
     try:
         db_access.delete_job(job_id, db_conn)
     except Exception as e:
+        logging.error("Error deleting job from database: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=500)
     asyncio.create_task(delete_job(job_id))
+    logging.info("Job deleted", extra={"json_fields" : log_data})
     return web.json_response({'success': True}, status=200)
 
 
