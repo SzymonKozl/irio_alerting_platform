@@ -38,7 +38,6 @@ async def add_service(request: web.Request):
 
 
 async def receive_alert(request: web.Request):
-    assert False
     try:
         # Not using json here, because we want to send a link through email
         notification_id = int(request.query['notification_id'])
