@@ -86,7 +86,8 @@ class MailServer:
 
     def last_mail_to(self, receiver: str) -> Optional[str]:
         content = None
-        with open("mail.log", "r") as mail_log:
+        with open("mail.log", "a+") as mail_log:
+            mail_log.seek(0)
             for line in mail_log:
                 if line.strip().split(';')[0] == receiver:
                     content = line.strip().split(';', 1)[1]
