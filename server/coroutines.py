@@ -8,6 +8,7 @@ from aiohttp import ClientSession
 from typing import Tuple, Optional
 from email.mime.text import MIMEText
 from datetime import datetime
+import logging
 
 
 import db_access
@@ -28,11 +29,22 @@ smtp_lock = threading.Lock()
 
 
 def init_smtp():
-    smtp.starttls()
-    smtp.login(smtp_username, smtp_password)
-
+    log_data = {"function_name": "init_smtp"}
+    logging.info("Init SMTP called", extra={"json_fields": log_data})
+    
+    try:
+        smtp.starttls()
+        smtp.login(smtp_username, smtp_password)
+    except Exception as e:
+        logging.error("Error initializing SMTP connection: %s", e,
+                      extra={"json_fields": log_data})
+        raise e
+    logging.info("SMTP connection initialized", extra={"json_fields": log_data})
 
 def send_email(to: str, subject: str, body: str):
+    log_data = {"function_name": "send_email", "to": to, "subject": subject}
+    logging.info("Send email called", extra={"json_fields": log_data})
+
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = smtp_username
@@ -40,11 +52,16 @@ def send_email(to: str, subject: str, body: str):
     try:
         with smtp_lock:
             smtp.sendmail(smtp_username, to, msg.as_string())
+        logging.info("Email sent", extra={"json_fields": log_data})
     except Exception as e:
-        print(f"Error sending email: {e}")
+        logging.error(f"Error sending email: {e}", extra={"json_fields": log_data})
 
 
 def send_alert(to: str, url: str, notification_id: int, primary_admin: bool):
+    log_data = {"function_name": "send_alert", "to": to, "url": url,
+                "notification_id": notification_id, "primary_admin": primary_admin}
+    logging.info("Send alert called", extra={"json_fields": log_data})
+    
     link = f"http://{APP_HOST}:{APP_PORT}/receive_alert?notification_id={notification_id}&primary_admin={primary_admin}"
     subject = "Alert"
     body = f"Alert for {url}. Click {link} to acknowledge."
