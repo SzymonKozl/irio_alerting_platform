@@ -95,9 +95,9 @@ class MailServer:
 
 
 class MockServiceHandle:
-    def __init__(self, port):
+    def __init__(self, port: int, log_dir: str):
         self.port = port
-        self.log_file = open(f"service={self.port}.log", "w")
+        self.log_file = open(f"{log_dir}/service-{self.port}.log", "w")
         self.child_pid = -1
         self._create()
         
@@ -147,10 +147,10 @@ def handle_child_death(signum, frame):
 
 
 class AlertingServiceHandle:
-    def __init__(self):
+    def __init__(self, log_dir: str):
         log_net(info, "Creating...", "alerting service", 5000)
         self.port = 5000
-        self.log_file = open(f"server.log", "w")
+        self.log_file = open(f"{log_dir}/server.log", "w")
         if os.fork() == 0:
             subprocess.run(["python", "../../server/main.py", ">", "server.log"], stdout=self.log_file, stderr=self.log_file)
             exit(0)

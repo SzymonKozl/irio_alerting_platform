@@ -10,24 +10,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Check out the code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Set up Docker
       - name: Set up Docker
         uses: docker/setup-buildx-action@v2
 
-      # Step 3: Build Docker Image
       - name: Build Docker image
         run: |
           docker build -t alerting-platform-integration:test -f Dockerfile_integration  --build-arg SMTP_USERNAME="alertingplatformirio@localhost"  --build-arg SMTP_SERVER="localhost" --build-arg SMTP_PORT="1025" .
 
-      # Step 4: Run Tests Inside Docker
+      - name: Create log directory
+        run: mkdir -p logs
+
       - name: Run tests
         run: |
-          docker run --rm alerting-platform-integration:test
+          docker run --rm -v ${{ github.workspace }}/logs:/app/logs my-app:test alerting-platform-integration:test
 
-      # Step 5: Cleanup Docker resources (optional)
+      - name: Upload logs
+        if: failure() # Only upload logs if the job fails
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-logs
+          path: logs/
+
       - name: Clean up Docker
         run: docker system prune -f
