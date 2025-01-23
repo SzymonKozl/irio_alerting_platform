@@ -11,7 +11,7 @@ USER postgres
 
 ENV PATH="/var/lib/postgresql/.local/bin:$PATH"
 
-COPY . /home/postgres/repo
+COPY ../../unit_tests /home/postgres/repo
 WORKDIR /home/postgres/repo/unit_tests
 
 RUN pip install --user -r requirements.txt

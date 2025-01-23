@@ -18,7 +18,7 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t unit-tests -f unit_tests/Dockerfile .
+        docker build -t unit-tests -f test/unit/Dockerfile .
 
     - name: Run Docker container
       run: |
