@@ -17,18 +17,10 @@ from common import *
 deleted_jobs_cache = set()
 deleted_jobs_lock = asyncio.Lock()
 
-smtp_server = os.environ.get("SMTP_SERVER")
-smtp_server = 'smtp.gmail.com' if smtp_server is None else smtp_server
+smtp_server = 'smtp.gmail.com'
 smtp_port = 587
 smtp_username = os.environ.get('SMTP_USERNAME')
 smtp_password = os.environ.get('SMTP_PASSWORD')
-smtp = smtplib.SMTP(smtp_server, smtp_port)
-smtp_lock = threading.Lock()
-
-
-def init_smtp():
-    smtp.starttls()
-    smtp.login(smtp_username, smtp_password)
 
 
 def send_email(to: str, subject: str, body: str):
@@ -37,8 +29,10 @@ def send_email(to: str, subject: str, body: str):
     msg['From'] = smtp_username
     msg['To'] = to
     try:
-        with smtp_lock:
-            smtp.sendmail(smtp_username, to, msg.as_string())
+        smtp = smtplib.SMTP(smtp_server, smtp_port)
+        smtp.starttls()
+        smtp.login(smtp_username, smtp_password)
+        smtp.sendmail(smtp_username, to, msg.as_string())
     except Exception as e:
         print(f"Error sending email: {e}")
 

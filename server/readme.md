@@ -7,4 +7,3 @@ where "\<version\>" is python version that you are using.
 Environment variables:
 - `SMTP_USERNAME`: alerting platform email
 - `SMTP_PASSWORD`: alerting platform email password
-- `SMTP_SERVER`: mailing service address (`"smtp.gmail.com"` if not provided)

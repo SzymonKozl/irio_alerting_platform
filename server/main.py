@@ -3,7 +3,7 @@ import asyncio
 
 from common import *
 import db_access
-from coroutines import delete_job, new_job, init_smtp
+from coroutines import delete_job, new_job
 
 STATEFUL_SET_INDEX = 1 # todo: set to real value
 
@@ -93,9 +93,4 @@ app.router.add_get('/alerting_jobs', get_alerting_jobs)
 app.router.add_delete('/del_job', del_job)
 
 if __name__ == '__main__':
-    try:
-        init_smtp()
-    except Exception as e:
-          print(f"Error initializing smtp connection: {e}")
-
-    web.run_app(app, host=APP_HOST, port=APP_PORT)
+    web.run_app(app, host='0.0.0.0', port=APP_PORT)
