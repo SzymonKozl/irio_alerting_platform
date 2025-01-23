@@ -21,3 +21,4 @@ def setup_logging():
             format="%(asctime)s - %(funcName)s - %(levelname)s - %(message)s")
         _optimizations()
         logging.error("Error setting up Google Cloud logging: %s", e)
+        raise e

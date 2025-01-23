@@ -140,8 +140,12 @@ signal.signal(signal.SIGTERM, handle_SIGINT)
 if __name__ == '__main__':
     try:
         setup_logging()
+    except Exception as e:
+        logging.warning("Using default logging setup: %s", e)
+
+    try:
         init_smtp()
     except Exception as e:
-          print(f"Error initializing smtp connection: {e}")
+        logging.error("Error initializing smtp connection: %s", e)
 
     web.run_app(app, host=APP_HOST, port=APP_PORT)
