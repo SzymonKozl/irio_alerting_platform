@@ -8,12 +8,18 @@ from common import *
 import db_access
 from coroutines import delete_job, new_job, init_smtp
 
+import logging
+from logging_setup import setup_logging
+
 STATEFUL_SET_INDEX = 1 # todo: set to real value
 
 db_conn = db_access.setup_connection(DB_HOST, DB_PORT)
 
 
 async def add_service(request: web.Request):
+    log_data = {"function_name" : "add_service"}
+    logging.info("Add service request received", extra={"json_fields" : log_data})
+
     json = await request.json()
     try:
         url = json['url']
@@ -23,20 +29,29 @@ async def add_service(request: web.Request):
         alerting_window = json['alerting_window']
         response_time = json['response_time']
     except KeyError as e:
+        logging.error("Missing key in request: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
     if not isinstance(period, int) or not isinstance(alerting_window, int) or not isinstance(response_time, int):
+        logging.error("Invalid data type for period, alerting_window or response_time", 
+                      extra={"json_fields" : log_data})
         return web.json_response({'error': ERR_MSG_CREATE_POSITIVE_INT}, status=400)
     if period <= 0 or alerting_window <= 0 or response_time <= 0:
+        logging.error("Non-positive value for period, alerting_window or response_time",
+                      extra={"json_fields" : log_data})
         return web.json_response({'error': ERR_MSG_CREATE_POSITIVE_INT}, status=400)
 
     job_data = JobData(-1, mail1, mail2, url ,period, alerting_window, response_time)
     try:
         job_id = db_access.save_job(job_data, db_conn, STATEFUL_SET_INDEX)
     except Exception as e:
+        logging.error("Error saving job to database: %s", e, 
+                      extra={"json_fields" : {**log_data, "job_data" : job_data._asdict()}})
         return web.json_response({'error': str(e)}, status=501)
     job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time)
     asyncio.create_task(new_job(job_data))
 
+    logging.info("Service added", 
+                 extra={"json_fields" : {**log_data, "job_data" : job_data._asdict()}})
     return web.json_response({'success': True, 'job_id': job_id}, status=200)
 
 
@@ -106,6 +121,7 @@ signal.signal(signal.SIGTERM, handle_SIGINT)
 
 if __name__ == '__main__':
     try:
+        setup_logging()
         init_smtp()
     except Exception as e:
           print(f"Error initializing smtp connection: {e}")
