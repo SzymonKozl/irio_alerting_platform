@@ -25,7 +25,7 @@ jobs:
 
       - name: Run tests
         run: |
-          docker run --rm -v ${{ github.workspace }}/logs:/app/logs my-app:test alerting-platform-integration:test
+          docker run --rm -v ${{ github.workspace }}/logs:/app/logs alerting-platform-integration:test
 
       - name: Upload logs
         if: failure() # Only upload logs if the job fails
