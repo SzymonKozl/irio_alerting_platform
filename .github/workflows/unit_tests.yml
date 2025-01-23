@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     branches:
-      - 2-server-code
+      - main
 
 jobs:
   build-and-run:
