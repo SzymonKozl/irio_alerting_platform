@@ -56,20 +56,30 @@ async def add_service(request: web.Request):
 
 
 async def receive_alert(request: web.Request):
+    log_data = {"function_name" : "receive_alert"}
+    logging.info("Receive alert request received", extra={"json_fields" : log_data})
+    
     try:
         # Not using json here, because we want to send a link through email
         notification_id = int(request.query['notification_id'])
         primary_admin = request.query['primary_admin'].lower() == 'true'
     except KeyError as e:
+        logging.error("Missing key in request: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
     except ValueError as e:
+        logging.error("Invalid value for notification_id: %s", e,
+                      extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
 
+    log_data.update({"notification_id": notification_id, "primary_admin": primary_admin})
     try:
         db_access.update_notification_response_status(notification_id, primary_admin, db_conn)
     except Exception as e:
+        logging.error("Error updating alert response status: %s", e, 
+                      extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=500)
 
+    logging.info("Alert received", extra={"json_fields" : log_data})
     return web.json_response({'success': True}, status=200)
 
 
