@@ -21,7 +21,7 @@ jobs:
       # Step 3: Build Docker Image
       - name: Build Docker image
         run: |
-          docker build -t alerting-platform-integration:test -f Dockerfile_integration  --build-arg SMTP_USERNAME="alertingplatformirio@localhost"  --build-arg SMTP_SERVER="localhost" --build-arg SMTP_PORT="1025"
+          docker build -t alerting-platform-integration:test -f Dockerfile_integration  --build-arg SMTP_USERNAME="alertingplatformirio@localhost"  --build-arg SMTP_SERVER="localhost" --build-arg SMTP_PORT="1025" .
 
       # Step 4: Run Tests Inside Docker
       - name: Run tests
