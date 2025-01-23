@@ -1,5 +1,8 @@
 from aiohttp import web
+from aiohttp.web_runner import GracefulExit
 import asyncio
+import signal
+import os, sys
 
 from common import *
 import db_access
@@ -91,6 +94,15 @@ app.router.add_post('/add_service', add_service)
 app.router.add_get('/receive_alert', receive_alert)
 app.router.add_get('/alerting_jobs', get_alerting_jobs)
 app.router.add_delete('/del_job', del_job)
+
+
+def handle_SIGINT(signum, frame):
+    os.close(sys.stdout.fileno())
+    raise GracefulExit()
+
+
+signal.signal(signal.SIGTERM, handle_SIGINT)
+
 
 if __name__ == '__main__':
     try:

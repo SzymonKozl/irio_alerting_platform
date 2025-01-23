@@ -1,9 +1,12 @@
+import sys
 from asyncio import sleep
+from traceback import print_tb
 
 from aiohttp import web
 from aiohttp.web import GracefulExit
-from sys import argv, exit, stderr
+from sys import argv, exit, stderr, stdout
 import signal
+import os
 
 
 response_mode = 'normal'
@@ -48,11 +51,11 @@ app.router.add_post('/set_response_mode', set_response_mode)
 app.router.add_get('/pinging_endpoint', pinging_endpoint)
 
 
-def handle_SIGTERM(sig, frame):
+def handle_SIGINT(sig, frame):
     raise GracefulExit()
 
 
-signal.signal(signal.SIGTERM, handle_SIGTERM)
+signal.signal(signal.SIGTERM, handle_SIGINT)
 
 
 if __name__ == '__main__':

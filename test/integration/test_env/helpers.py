@@ -1,4 +1,5 @@
 import signal
+import sys
 from dataclasses import dataclass
 from typing import List, Optional
 import os
@@ -50,7 +51,7 @@ def scrap_ack_url(mail_content: str) -> str:
         mail_content = mail_content[:ix2]
         return mail_content
     except Exception as e:
-        error(f"notification id cound not be scrapped from email {e}")
+        error(f"notification id could not be scrapped from email {e}")
         return ""
 
 
@@ -82,6 +83,8 @@ class MailServer:
 
         self.controller.stop()
         self.thread = None
+        with open("mail.log", "w"):
+            pass
         info("Mail server stopped.")
 
     def last_mail_to(self, receiver: str) -> Optional[str]:
@@ -95,22 +98,21 @@ class MailServer:
 
 
 class MockServiceHandle:
+    serial_no = 0
     def __init__(self, port: int, log_dir: str):
         self.port = port
-        self.log_file = open(f"{log_dir}/service-{self.port}.log", "w")
-        self.child_pid = -1
+        self.log_file_path = f"{log_dir}/service-{self.port}-{MockServiceHandle.serial_no}.log"
+        MockServiceHandle.serial_no += 1
+        self.child_process = None
         self._create()
         
     def _create(self):
         log_net(info, "Creating...", "mock service", self.port)
-        self.child_pid = os.fork()
-        if self.child_pid == 0:
-            subprocess.run(["python", "test_env/mock_server.py", "localhost", str(self.port)], stdout=self.log_file, stderr=self.log_file)
-            exit(0)
+        with open(self.log_file_path, "a") as log_file:
+            self.child_process = subprocess.Popen(["python", "test_env/mock_server.py", "localhost", str(self.port)], stdout=log_file, stderr=log_file)
 
     def close(self):
-        self.log_file.close()
-        os.kill(self.child_pid, signal.SIGTERM)
+        os.kill(self.child_process.pid, signal.SIGINT)
 
     def _set_mode(self, mode: str):
         resp = requests.post(f"http://localhost:{self.port}/set_response_mode?mode={mode}")
@@ -147,18 +149,21 @@ def handle_child_death(signum, frame):
 
 
 class AlertingServiceHandle:
+    serial_no = 0
     def __init__(self, log_dir: str):
         log_net(info, "Creating...", "alerting service", 5000)
         self.port = 5000
-        self.log_file = open(f"{log_dir}/server.log", "w")
-        if os.fork() == 0:
-            subprocess.run(["python", "../../server/main.py", ">", "server.log"], stdout=self.log_file, stderr=self.log_file)
-            exit(0)
+        self.log_filename = f"{log_dir}/alert-{self.port}-{AlertingServiceHandle.serial_no}.log"
+        AlertingServiceHandle.serial_no += 1
+        log_file = open(self.log_filename, "a")
+        self.child_process = None
+        self.child_process = subprocess.Popen(["python", "../../server/main.py", ">", "server.log"], stdout=log_file, stderr=log_file)
+        log_file.close()
 
 
     def add_pinging_job(self, job_data: PingingJob) -> int:
         payload = {
-            "url": job_data.url if isinstance(job_data.url, str) else job_data.url.port,
+            "url": job_data.url if isinstance(job_data.url, str) else f"http://localhost:{job_data.url.port}/pinging_endpoint",
             "alerting_window": job_data.alerting_window,
             "period": job_data.period,
             "primary_email": job_data.mail1,
@@ -219,5 +224,9 @@ class AlertingServiceHandle:
             log_net(info, f"acknowledged alert: {link}", self.__class__.__name__, self.port)
             return True
         else:
-            log_net(warn, f"failed to acknowledge alert with link {link}. response code: {resp.status_code}, reponse: {resp.text}", self.__class__.__name__, self.port)
+            log_net(warn, f"failed to acknowledge alert with link {link}. response code: {resp.status_code}, response: {resp.text}", self.__class__.__name__, self.port)
             return False
+
+
+    def close(self):
+        os.kill(self.child_process.pid, signal.SIGTERM)
