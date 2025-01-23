@@ -42,6 +42,9 @@ def init_smtp():
     logging.info("SMTP connection initialized", extra={"json_fields": log_data})
 
 def send_email(to: str, subject: str, body: str):
+    log_data = {"function_name": "send_email", "to": to, "subject": subject}
+    logging.info("Send email called", extra={"json_fields": log_data})
+
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = smtp_username
@@ -49,8 +52,9 @@ def send_email(to: str, subject: str, body: str):
     try:
         with smtp_lock:
             smtp.sendmail(smtp_username, to, msg.as_string())
+        logging.info("Email sent", extra={"json_fields": log_data})
     except Exception as e:
-        print(f"Error sending email: {e}")
+        logging.error(f"Error sending email: {e}", extra={"json_fields": log_data})
 
 
 def send_alert(to: str, url: str, notification_id: int, primary_admin: bool):
