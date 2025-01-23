@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-server_dir = Path(__file__).parent.parent / "server"
+server_dir = Path(__file__).parent.parent.parent / "server"
 sys.path.append(str(server_dir))
 
 import pytest

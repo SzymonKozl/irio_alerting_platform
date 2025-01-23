@@ -11,9 +11,9 @@ USER postgres
 
 ENV PATH="/var/lib/postgresql/.local/bin:$PATH"
 
-COPY ../../test/unit /home/postgres/repo
-WORKDIR /home/postgres/repo/test/unit
+COPY . /home/postgres/repo
+WORKDIR /home/postgres/repo
 
-RUN pip install --user -r requirements.txt
+RUN pip install --user -r test/unit/requirements.txt
 
 CMD ["pytest", "-p", "no:cacheprovider"]
