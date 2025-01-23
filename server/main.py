@@ -84,19 +84,27 @@ async def receive_alert(request: web.Request):
 
 
 async def get_alerting_jobs(request: web.Request):
+    log_data = {"function_name" : "get_alerting_jobs"}
+    logging.info("Get alerting jobs request received", extra={"json_fields" : log_data})
+
     json = await request.json()
     try:
         mail1 = json['primary_email']
     except KeyError as e:
+        logging.error("Missing key in request: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
 
+    log_data["primary_email"] = mail1
     try:
         jobs = db_access.get_jobs(mail1, db_conn)
     except Exception as e:
+        logging.error("Error getting jobs from database: %s", e,
+                      extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=500)
     resp = {"jobs": []}
     for job in jobs:
         resp["jobs"].append(job._asdict())
+    logging.info("Alerting jobs retrieved", extra={"json_fields" : log_data})
     return web.json_response(resp, status=200)
 
 
