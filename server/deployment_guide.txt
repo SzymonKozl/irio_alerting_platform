@@ -27,6 +27,7 @@ kubectl create configmap alerting-app-config -n pg-ns --from-literal=external-ip
 kubectl apply -f server/k8s/stateful-set.yaml
 
 MONITORING SETUP
+(tutorial not tested)
 
 9. create namespace
 kubectl create namespace monitoring
@@ -70,6 +71,22 @@ note: i am not sure whether this step will work
 a) create secret with smtp credentials
 for simplicity I used our mail for sending normal alerts
 kubectl create secret -n monitoring generic notifications-smtp  --from-literal=user=<our alerting platform mail>  --from-literal=<secret password> --from-literal=host=smtp.gma
-il.com
+il.com:587
 
-b)
+b) in server/k8s/grafana-deployment-patch.yaml insert your mail address under GF_SMTP_FROM_ADDRESS variable
+
+b) apply patch to grafana deployment
+kubectl patch -n monitoring deployment grafana --patch-file server/k8s/grafana-deployment-patch.yaml
+
+c) in grafana, go to the Alerting>contact points tab and create contact point with your email
+
+19. Alert setup
+
+Go to Alerting>new alert and configure alert with:
+query: count(kube_pod_info{created_by_name="alerting-app"})
+leave one expression: Threshold for input, below 3
+in "3. Set evaluation behavior" section: insert random values, it should work anyway. two values are important:
+"Pending period" should be ~2min
+"Evaluation interval" for evaluation group should be 10s
+Add your contact point defined in 18.c).
+Add alert message, for example "stanął w ogniu nasz wielki dom"
