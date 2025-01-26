@@ -1,5 +1,7 @@
 from aiohttp import web
 import asyncio
+from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+from counters import *
 
 from common import *
 import db_access
@@ -8,6 +10,16 @@ from coroutines import delete_job, new_job
 STATEFUL_SET_INDEX = 1 # todo: set to real value
 
 db_conn = db_access.setup_connection(DB_HOST, DB_PORT)
+
+
+async def metrics_handler(request):
+    """Expose Prometheus metrics."""
+    return web.Response(body=generate_latest(), content_type=CONTENT_TYPE_LATEST.rsplit(';', 1)[0])
+
+
+async def health_handler(request):
+    """Health check endpoint."""
+    return web.Response(text="OK", status=200)
 
 
 async def add_service(request: web.Request):
@@ -90,6 +102,8 @@ app = web.Application()
 app.router.add_post('/add_service', add_service)
 app.router.add_get('/receive_alert', receive_alert)
 app.router.add_get('/alerting_jobs', get_alerting_jobs)
+app.router.add_get('/metrics_handler', metrics_handler)
+app.router.add_get('/healthz', health_handler)
 app.router.add_delete('/del_job', del_job)
 
 if __name__ == '__main__':

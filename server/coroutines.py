@@ -1,8 +1,6 @@
 import asyncio
 import time
 import smtplib
-import os
-import threading
 from queue import PriorityQueue
 from aiohttp import ClientSession
 from typing import Tuple, Optional
@@ -12,6 +10,7 @@ from datetime import datetime
 
 import db_access
 from common import *
+from counters import *
 
 
 deleted_jobs_cache = set()
@@ -53,11 +52,20 @@ async def delete_job(job_id: job_id_t) -> bool:
 async def pinging_job(job_data: JobData):
 
     async def single_request():
+        is_connected = False
         try:
             async with ClientSession() as session:
+                PINGS_SENT_CTR.inc()
+                is_connected = True
+                HTTP_CONNS_ACTIVE_CTR.inc()
                 async with session.get(job_data.url) as response:
+                    if 200 <= response.status < 300:
+                        SUCCESSFUL_PINGS_CTR.inc()
+                    HTTP_CONNS_ACTIVE_CTR.dec()
                     return response
         except:
+            if is_connected:
+                HTTP_CONNS_ACTIVE_CTR.dec()
             return None
 
     futures: PriorityQueue[Tuple[int, asyncio.Task]] = PriorityQueue()
@@ -65,6 +73,7 @@ async def pinging_job(job_data: JobData):
         async with deleted_jobs_lock:
             if job_data.job_id in deleted_jobs_cache:
                 deleted_jobs_cache.remove(job_data.job_id)
+                JOBS_ACTIVE_CTR.dec()
                 return
 
         task = asyncio.create_task(single_request())
@@ -96,6 +105,7 @@ async def pinging_job(job_data: JobData):
                 try:
                     notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, False), conn)
                     db_access.delete_job(job_data.job_id, conn)
+                    JOBS_ACTIVE_CTR.dec()
 
                     send_alert(job_data.mail1, job_data.url, notification_id, True)
 
@@ -118,4 +128,5 @@ async def pinging_job(job_data: JobData):
 
 
 async def new_job(job_data: JobData):
+    JOBS_ACTIVE_CTR.inc()
     await pinging_job(job_data)
