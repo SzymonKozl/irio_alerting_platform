@@ -19,6 +19,7 @@ spec:
       containers:
       - name: alerting-app-container
         image: gcr.io/<project-id>/alerting-app
+        imagePullPolicy: "Always"
         ports:
         - containerPort: 8080
         env:
