@@ -25,3 +25,11 @@ kubectl create configmap alerting-app-config -n pg-ns --from-literal=external-ip
 8. Run:
 
 kubectl apply -f server/k8s/stateful-set.yaml
+
+9. prometheus setup
+install prometheus
+"""
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install prometheus prometheus-community/prometheus
+"""
