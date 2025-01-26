@@ -59,7 +59,17 @@ kubectl get svc -n monitoring
 to get external ip of grafana
 
 15. login into grafana under external ip address using uname 'admin' and password fetched in step 13.
+
 16. go to connections>data sources tab and add new prometheus data source
 The only thing you need to modify is the prometheus URL. insert "http://prometheus-server.monitoring.svc.cluster.local:80"
+
 17. go to the 'dashboards' tab > new > import > use json files from server/monitoring/grafana_dashboards to configure dashboards
 note: i am not sure whether this step will work
+
+18. mail setup for grafana alerts:
+a) create secret with smtp credentials
+for simplicity I used our mail for sending normal alerts
+kubectl create secret -n monitoring generic notifications-smtp  --from-literal=user=<our alerting platform mail>  --from-literal=<secret password> --from-literal=host=smtp.gma
+il.com
+
+b)
