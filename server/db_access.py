@@ -26,11 +26,11 @@ def setup_connection(db_host: str, db_port: int) -> Optional[psycopg2.extensions
     return conn
 
 
-def delete_job(job_id: job_id_t, conn: psycopg2.extensions.connection) -> None:
+def set_job_inactive(job_id: job_id_t, conn: psycopg2.extensions.connection) -> None:
     cursor = conn.cursor()
     cursor.execute(
         f"""
-        DELETE FROM jobs WHERE job_id = %s;
+        UPDATE jobs SET is_active=false WHERE jobs.job_id = %s;
         """,
         (job_id,)
     )
@@ -41,10 +41,10 @@ def save_job(job: JobData, conn: psycopg2.extensions.connection, set_idx: int) -
     cursor = conn.cursor()
     cursor.execute(
         f"""
-        INSERT INTO jobs VALUES (DEFAULT, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO jobs VALUES (DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING job_id;
         """,
-        (job.mail1, job.mail2, job.url, job.period, job.window, job.response_time, set_idx)
+        (job.mail1, job.mail2, job.url, job.period, job.window, job.response_time, set_idx, job.is_active)
     )
     conn.commit()
     return job_id_t(cursor.fetchone()[0])
@@ -62,7 +62,7 @@ def get_jobs(primary_email: str, conn: psycopg2.extensions.connection) -> List[J
 
     jobs = []
     for row in rows:
-        jobs.append(JobData(row[0], row[1], row[2], row[3], row[4], row[5], row[6]))
+        jobs.append(JobData(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[8]))
     return jobs
 
 
@@ -70,10 +70,10 @@ def save_notification(notification: NotificationData, conn: psycopg2.extensions.
     cursor = conn.cursor()
     cursor.execute(
         f"""
-        INSERT INTO notifications VALUES (DEFAULT, %s, %s, %s)
+        INSERT INTO notifications VALUES (DEFAULT, %s, %s, %s, %s)
         RETURNING notification_id;
         """,
-        (notification.time_sent, notification.admin_responded, notification.notification_num)
+        (notification.time_sent, notification.admin_responded, notification.notification_num, notification.job_id)
     )
     conn.commit()
     return notification_id_t(cursor.fetchone()[0])

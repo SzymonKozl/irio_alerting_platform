@@ -93,14 +93,14 @@ async def add_service(request: web.Request):
                       extra={"json_fields" : log_data})
         return web.json_response({'error': ERR_MSG_CREATE_POSITIVE_INT}, status=400)
 
-    job_data = JobData(-1, mail1, mail2, url ,period, alerting_window, response_time)
+    job_data = JobData(-1, mail1, mail2, url ,period, alerting_window, response_time, True)
     try:
         job_id = db_access.save_job(job_data, db_conn, STATEFUL_SET_INDEX)
     except Exception as e:
         logging.error("Error saving job to database: %s", e, 
                       extra={"json_fields" : {**log_data, "job_data" : job_data._asdict()}})
         return web.json_response({'error': str(e)}, status=501)
-    job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time)
+    job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time, True)
     asyncio.create_task(new_job(job_data))
 
     logging.info("Service added", 
@@ -249,7 +249,7 @@ async def del_job(request: web.Request):
         
     log_data["job_id"] = job_id
     try:
-        db_access.delete_job(job_id, db_conn)
+        db_access.set_job_inactive(int(job_id), db_conn)
     except Exception as e:
         logging.error("Error deleting job from database: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=500)

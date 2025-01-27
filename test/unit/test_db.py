@@ -21,26 +21,34 @@ def setup_db(conn):
     conn.commit()
 
 
-def test_db_access_delete_job(postgresql):
+def insert_example_jobs(conn):
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail1@example.com', 'mail2@example.com', 'http://example.com', 10, 11, 12, 0, true)")
+    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail3@example.com', 'mail2@example.com', 'http://ugabuga.com', 100, 100, 200, 1, true)")
+    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail4@example.com', 'mail5@example.com', 'http://service.com', 1000, 10, 100, 1, false)")
+    conn.commit()
+
+
+def test_db_access_set_job_inactive(postgresql):
     setup_db(postgresql)
 
     cursor = postgresql.cursor()
-    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail1@example.com', 'mail2@example.com', 'http://example.com', 10, 20, 30, 0);")
-    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail3@example.com', 'mail4@example.com', 'http://another.com', 11, 21, 31, 1);")
+    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail1@example.com', 'mail2@example.com', 'http://example.com', 10, 20, 30, 0, true);")
+    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail3@example.com', 'mail4@example.com', 'http://another.com', 11, 21, 31, 1, true);")
     postgresql.commit()
 
-    cursor.execute("SELECT job_id FROM jobs;")
+    cursor.execute("SELECT job_id FROM jobs WHERE is_active;")
     jobs_before = cursor.fetchall()
     assert len(jobs_before) == 2
 
-    id_to_delete = jobs_before[0][0]
+    id_to_deactivate = jobs_before[0][0]
 
-    db_access.delete_job(id_to_delete, postgresql)
+    db_access.set_job_inactive(id_to_deactivate, postgresql)
 
-    cursor.execute("SELECT job_id FROM jobs;")
+    cursor.execute("SELECT job_id FROM jobs WHERE is_active;")
     jobs_after = cursor.fetchall()
     assert len(jobs_after) == 1
-    assert jobs_after[0][0] != id_to_delete
+    assert jobs_after[0][0] != id_to_deactivate
 
     cursor.close()
 
@@ -55,7 +63,8 @@ def test_db_access_save_job(postgresql):
         url="http://example.com",
         period=30,
         window=10,
-        response_time=200
+        response_time=200,
+        is_active=True
     )
     
     set_idx = 1
@@ -76,9 +85,9 @@ def test_db_access_get_jobs(postgresql):
     primary_email = "mail1@example.com"
 
     cursor = postgresql.cursor()
-    cursor.execute(f"INSERT INTO jobs VALUES (DEFAULT, '{primary_email}', 'mail2@example.com', 'http://example.com', 10, 20, 30, 0);")
-    cursor.execute(f"INSERT INTO jobs VALUES (DEFAULT, '{primary_email}', 'mail3@example.com', 'http://another.com', 11, 21, 31, 1);")
-    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail4@example.com', 'mail5@example.com', 'http://yetanother.com', 12, 22, 32, 2);")
+    cursor.execute(f"INSERT INTO jobs VALUES (DEFAULT, '{primary_email}', 'mail2@example.com', 'http://example.com', 10, 20, 30, 0, true);")
+    cursor.execute(f"INSERT INTO jobs VALUES (DEFAULT, '{primary_email}', 'mail3@example.com', 'http://another.com', 11, 21, 31, 1, false);")
+    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail4@example.com', 'mail5@example.com', 'http://yetanother.com', 12, 22, 32, 2, true);")
     postgresql.commit()
 
     jobs = db_access.get_jobs(primary_email, postgresql)
@@ -98,16 +107,20 @@ def test_db_access_get_jobs(postgresql):
     assert job2.window == 21
     assert job1.response_time == 30
     assert job2.response_time == 31
+    assert job1.is_active == True
+    assert job2.is_active == False
 
 
 def test_db_access_save_notification(postgresql):
     setup_db(postgresql)
+    insert_example_jobs(postgresql)
 
     notification = NotificationData(
         notification_id=-1,
         time_sent=datetime.now(),
         admin_responded=False,
-        notification_num=1
+        notification_num=1,
+        job_id=1
     )
 
     notification_id = db_access.save_notification(notification, postgresql)
@@ -122,11 +135,12 @@ def test_db_access_save_notification(postgresql):
 
 def test_db_access_get_notification_by_id(postgresql):
     setup_db(postgresql)
+    insert_example_jobs(postgresql)
 
     cursor = postgresql.cursor()
-    cursor.execute("INSERT INTO notifications VALUES (0, CURRENT_TIMESTAMP, FALSE, 1);")
-    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, 2);")
-    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, 1);")
+    cursor.execute("INSERT INTO notifications VALUES (0, CURRENT_TIMESTAMP, FALSE, 1, 1);")
+    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, 2, 3);")
+    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, 1, 3);")
     postgresql.commit()
 
     notification = db_access.get_notification_by_id(1, postgresql)
@@ -137,13 +151,14 @@ def test_db_access_get_notification_by_id(postgresql):
 
 def test_db_access_udate_notification_response_status1(postgresql):
     setup_db(postgresql)
+    insert_example_jobs(postgresql)
 
     notification_id = 0
 
     cursor = postgresql.cursor()
-    cursor.execute(f"INSERT INTO notifications VALUES ({notification_id}, CURRENT_TIMESTAMP, FALSE, 1);")
-    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, 1);")
-    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, 2);")
+    cursor.execute(f"INSERT INTO notifications VALUES ({notification_id}, CURRENT_TIMESTAMP, FALSE, 1, 3);")
+    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, 1, 2);")
+    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, 2, 1);")
     postgresql.commit()
 
     db_access.update_notification_response_status(notification_id, postgresql)
