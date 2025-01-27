@@ -1,5 +1,6 @@
 from aiohttp import web
 from aiohttp.web_runner import GracefulExit
+from aiohttp_swagger import setup_swagger
 import asyncio
 import signal
 import os, sys
@@ -16,6 +17,59 @@ db_conn = db_access.setup_connection(DB_HOST, DB_PORT)
 
 
 async def add_service(request: web.Request):
+    """
+    ---
+    description: Adds a service to monitor.
+    tags:
+      - Service Monitoring
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            url:
+              type: string
+              description: URL of the service.
+              example: "https://www.google.com/"
+            primary_email:
+              type: string
+              description: Email of the primary administrator.
+              example: "primary@example.com"
+            secondary_email:
+              type: string
+              description: Email of the secondary administrator.
+              example: "secondary@gmail.com"
+            period:
+              type: integer
+              description: Service check period in ms.
+              example: 10000
+            alerting_window:
+              type: integer
+              description: Alerting window in ms.
+              example: 10000
+            response_time:
+              type: integer
+              description: Response time in ms.
+              example: 10000
+    responses:
+      "200":
+        description: Successful response
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: True
+            job_id:
+              type: integer
+              example: 0
+    """
     log_data = {"function_name" : "add_service"}
     logging.info("Add service request received", extra={"json_fields" : log_data})
 
@@ -55,11 +109,40 @@ async def add_service(request: web.Request):
 
 
 async def receive_alert(request: web.Request):
+    """
+    ---
+    description: Confirms that an alert was received.
+    tags:
+      - Service Monitoring
+    produces:
+      - application/json
+    parameters:
+      - in: query
+        name: notification_id
+        required: true
+        type: integer
+        description: ID of the received notification.
+        example: 0
+      - in: query
+        name: primary_admin
+        required: true
+        type: boolean
+        description: Received by the primary admin.
+        example: true
+    responses:
+      "200":
+        description: Successful response
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: True
+    """
     log_data = {"function_name" : "receive_alert"}
     logging.info("Receive alert request received", extra={"json_fields" : log_data})
     
     try:
-        # Not using json here, because we want to send a link through email
         notification_id = int(request.query['notification_id'])
         primary_admin = request.query['primary_admin'].lower() == 'true'
     except KeyError as e:
@@ -83,12 +166,35 @@ async def receive_alert(request: web.Request):
 
 
 async def get_alerting_jobs(request: web.Request):
+    """
+    ---
+    description: Returns IDs of alerting job with a specified primary administrator's email.
+    tags:
+      - Service Monitoring
+    produces:
+      - application/json
+    parameters:
+      - in: query
+        name: primary_email
+        required: true
+        type: string
+        description: Email of the primary administrator.
+        example: "primary@example.com"
+    responses:
+      "200":
+        description: Successful response
+        schema:
+          type: object
+          properties:
+            jobs:
+              type: array
+              example: []
+    """
     log_data = {"function_name" : "get_alerting_jobs"}
     logging.info("Get alerting jobs request received", extra={"json_fields" : log_data})
 
-    json = await request.json()
     try:
-        mail1 = json['primary_email']
+        mail1 = request.query['primary_email']
     except KeyError as e:
         logging.error("Missing key in request: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
@@ -108,12 +214,35 @@ async def get_alerting_jobs(request: web.Request):
 
 
 async def del_job(request: web.Request):
+    """
+    ---
+    description: Deletes a monitored service.
+    tags:
+      - Service Monitoring
+    produces:
+      - application/json
+    parameters:
+      - in: query
+        name: job_id
+        required: true
+        type: integer
+        description: ID of the alerting job to delete.
+        example: 0
+    responses:
+      "200":
+        description: Successful response
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: True
+    """
     log_data = {"function_name" : "del_job"}
     logging.info("Delete job request received", extra={"json_fields" : log_data})
 
-    json = await request.json()
     try:
-        job_id = json['job_id']
+        job_id = request.query['job_id']
     except KeyError as e:
         logging.error("Missing key in request: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
@@ -134,6 +263,7 @@ app.router.add_post('/add_service', add_service)
 app.router.add_get('/receive_alert', receive_alert)
 app.router.add_get('/alerting_jobs', get_alerting_jobs)
 app.router.add_delete('/del_job', del_job)
+setup_swagger(app, swagger_url="/api/doc", title="Alerting Platform API", description="API Documentation")
 
 
 def handle_SIGINT(signum, frame):
