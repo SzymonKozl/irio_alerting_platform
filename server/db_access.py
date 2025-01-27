@@ -1,5 +1,5 @@
 import os
-from typing import Optional, List
+from typing import Optional, List, Set
 
 import psycopg2
 
@@ -102,3 +102,21 @@ def update_notification_response_status(notification_id: int, conn: psycopg2.ext
     )
 
     conn.commit()
+
+
+def get_active_job_ids(conn: psycopg2.extensions.connection, pod_index: int) -> Set[job_id_t]:
+    """
+    :param conn: postgres connection
+    :param pod_index: index of pod
+    :return: list of all active jobs assigned to this pod
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT job_id FROM jobs WHERE is_active = TRUE and stateful_set_index = %s;
+        """,
+        (pod_index,)
+    )
+    conn.commit()
+
+    return {job_id_t(x[0]) for x in cursor.fetchall()}

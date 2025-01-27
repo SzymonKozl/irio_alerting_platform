@@ -15,8 +15,9 @@ import db_access
 from common import *
 
 
-deleted_jobs_cache = set()
-deleted_jobs_lock = asyncio.Lock()
+active_jobs_cache = set()
+active_jobs_sync_loc = threading.Lock()
+cleanup_job_initialized = False
 
 smtp_server = os.environ.get("SMTP_SERVER")
 smtp_server = 'smtp.gmail.com' if not smtp_server else smtp_server
@@ -68,13 +69,14 @@ def send_alert(to: str, url: str, notification_id: int, primary_admin: bool):
     send_email(to, subject, body)
 
 
-async def delete_job(job_id: job_id_t) -> bool:
-    async with deleted_jobs_lock:
-        deleted_jobs_cache.add(job_id)
-    return False
-
-
-async def pinging_job(job_data: JobData):
+async def pinging_task(job_data: JobData, pod_index: int):
+    global cleanup_job_initialized, active_jobs_sync_loc
+    with active_jobs_sync_loc:
+        active_jobs_cache.add(job_data.job_id)
+        if not cleanup_job_initialized:
+            logging.info("Starting active job updater job")
+            cleanup_job_initialized = True
+            asyncio.create_task(active_job_updater_task(pod_index))
 
     async def single_request():
         try:
@@ -86,9 +88,11 @@ async def pinging_job(job_data: JobData):
 
     futures: PriorityQueue[Tuple[int, asyncio.Task]] = PriorityQueue()
     while True:
-        async with deleted_jobs_lock:
-            if job_data.job_id in deleted_jobs_cache:
-                deleted_jobs_cache.remove(job_data.job_id)
+
+        delay_start = time.time_ns()
+        with active_jobs_sync_loc:
+            if job_data.job_id not in active_jobs_cache:
+                logging.info(f"Found that job with {job_data.job_id} is not active. finishing task.", extra={"json_fields": job_data})
                 return
 
         task = asyncio.create_task(single_request())
@@ -130,7 +134,7 @@ async def pinging_job(job_data: JobData):
                     await asyncio.sleep(job_data.response_time / 1000)
                     conn = db_access.setup_connection(DB_HOST, DB_PORT)
 
-                    if not (xd:=db_access.get_notification_by_id(notification_id, conn)).admin_responded:
+                    if not db_access.get_notification_by_id(notification_id, conn).admin_responded:
                         second_notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 2, job_data.job_id), conn)
                         send_alert(job_data.mail2, job_data.url, second_notification_id, False)
 
@@ -141,8 +145,32 @@ async def pinging_job(job_data: JobData):
                     conn.close()
                 return
 
-        await asyncio.sleep(job_data.period / 1000)
+        delay = time.time_ns() - delay_start
+        if delay / 1_000_000 > job_data.period:
+            logging.warning("handling the event loop consumed more time than the pinging period! keeping pinging period cannot be guaranteed!", extra={"json_fields": job_data})
+        await asyncio.sleep(max(0, job_data.period / 1000 - delay / 1_000_000))
 
 
-async def new_job(job_data: JobData):
-    await pinging_job(job_data)
+async def new_job(job_data: JobData, pod_index: int):
+    await pinging_task(job_data, pod_index)
+
+
+async def active_job_updater_task(pod_index: int):
+    global active_jobs_cache, active_jobs_sync_loc
+    """
+    Responsible for stopping deleted jobs.
+    :param pod_index: pod index
+    :return: None
+    """
+    while True:
+        await asyncio.sleep(1)
+        conn = db_access.setup_connection(DB_HOST, DB_PORT)
+        try:
+            active_jobs_cache_new = db_access.get_active_job_ids(conn, pod_index)
+        except:
+            active_jobs_cache_new = None
+        finally:
+            conn.close()
+        if active_jobs_cache_new is not None:
+            with active_jobs_sync_loc:
+                active_jobs_cache = active_jobs_cache_new

@@ -21,11 +21,20 @@ def setup_db(conn):
     conn.commit()
 
 
+EXAMPLE_JOBS = [
+    JobData(1, "mail1@example.com", "mail2@example.com", "http://example.com", 10, 11, 12, True),
+    JobData(2, "mail3@example.com", "mail2@example.com", "http://ugabuga.com", 100, 100, 200, True),
+    JobData(3, "mail4@example.com", "mail5@example.com", "http://service.com", 1000, 10, 100, False)
+]
+
+EXAMPLE_JOBS_PODS = [0, 1, 1]
+
+
 def insert_example_jobs(conn):
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail1@example.com', 'mail2@example.com', 'http://example.com', 10, 11, 12, 0, true)")
-    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail3@example.com', 'mail2@example.com', 'http://ugabuga.com', 100, 100, 200, 1, true)")
-    cursor.execute("INSERT INTO jobs VALUES (DEFAULT, 'mail4@example.com', 'mail5@example.com', 'http://service.com', 1000, 10, 100, 1, false)")
+    for job, pod in zip(EXAMPLE_JOBS, EXAMPLE_JOBS_PODS):
+        cursor.execute("INSERT INTO jobs VALUES (DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s)",
+                       (job.mail1, job.mail2, job.url, job.period, job.window, job.response_time, pod, job.is_active))
     conn.commit()
 
 
@@ -168,3 +177,14 @@ def test_db_access_udate_notification_response_status1(postgresql):
 
     assert result is not None
     assert result[0] == True
+
+
+def test_db_access_get_active_job_ids(postgresql):
+    setup_db(postgresql)
+    insert_example_jobs(postgresql)
+
+    for pod_id in set(EXAMPLE_JOBS_PODS):
+        job_ids = db_access.get_active_job_ids(postgresql, pod_id)
+        for job_pod_id, job in zip(EXAMPLE_JOBS_PODS, EXAMPLE_JOBS):
+            if job_pod_id == pod_id and job.is_active:
+                assert job.job_id in job_ids

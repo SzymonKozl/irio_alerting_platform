@@ -8,7 +8,7 @@ import logging
 
 from common import *
 import db_access
-from coroutines import delete_job, new_job, init_smtp
+from coroutines import new_job, init_smtp
 from logging_setup import setup_logging
 
 STATEFUL_SET_INDEX = 1 # todo: set to real value
@@ -101,7 +101,7 @@ async def add_service(request: web.Request):
                       extra={"json_fields" : {**log_data, "job_data" : job_data._asdict()}})
         return web.json_response({'error': str(e)}, status=501)
     job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time, True)
-    asyncio.create_task(new_job(job_data))
+    asyncio.create_task(new_job(job_data, STATEFUL_SET_INDEX))
 
     logging.info("Service added", 
                  extra={"json_fields" : {**log_data, "job_data" : job_data._asdict()}})
@@ -253,7 +253,6 @@ async def del_job(request: web.Request):
     except Exception as e:
         logging.error("Error deleting job from database: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=500)
-    asyncio.create_task(delete_job(job_id))
     logging.info("Job deleted", extra={"json_fields" : log_data})
     return web.json_response({'success': True}, status=200)
 
