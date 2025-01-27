@@ -155,7 +155,7 @@ async def receive_alert(request: web.Request):
 
     log_data.update({"notification_id": notification_id, "primary_admin": primary_admin})
     try:
-        db_access.update_notification_response_status(notification_id, primary_admin, db_conn)
+        db_access.update_notification_response_status(notification_id, db_conn)
     except Exception as e:
         logging.error("Error updating alert response status: %s", e, 
                       extra={"json_fields" : log_data})

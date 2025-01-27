@@ -1,3 +1,6 @@
+DROP TABLE IF EXISTS jobs;
+DROP TABLE IF EXISTS notifications;
+
 CREATE TABLE jobs (
     job_id SERIAL PRIMARY KEY not null,
     mail1 varchar(255) not null,
@@ -12,6 +15,6 @@ CREATE TABLE jobs (
 CREATE TABLE notifications (
     notification_id SERIAL PRIMARY KEY not null,
     time_sent timestamp not null,
-    primary_admin_responded BOOLEAN DEFAULT FALSE,
-    secondary_admin_responded BOOLEAN DEFAULT FALSE
+    admin_responded BOOLEAN not null,
+    notification_no INT not null
 );

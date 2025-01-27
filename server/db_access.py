@@ -66,17 +66,6 @@ def get_jobs(primary_email: str, conn: psycopg2.extensions.connection) -> List[J
     return jobs
 
 
-def delete_notification(notification_id: int, conn: psycopg2.extensions.connection) -> None:
-    cursor = conn.cursor()
-    cursor.execute(
-        f"""
-        DELETE FROM notifications WHERE notification_id = %s;
-        """,
-        (notification_id,)
-    )
-    conn.commit()
-
-
 def save_notification(notification: NotificationData, conn: psycopg2.extensions.connection) -> notification_id_t:
     cursor = conn.cursor()
     cursor.execute(
@@ -84,7 +73,7 @@ def save_notification(notification: NotificationData, conn: psycopg2.extensions.
         INSERT INTO notifications VALUES (DEFAULT, %s, %s, %s)
         RETURNING notification_id;
         """,
-        (notification.time_sent, notification.primary_admin_responded, notification.secondary_admin_responded)
+        (notification.time_sent, notification.admin_responded, notification.notification_num)
     )
     conn.commit()
     return notification_id_t(cursor.fetchone()[0])
@@ -102,22 +91,14 @@ def get_notification_by_id(notification_id: int, conn: psycopg2.extensions.conne
     return NotificationData(*cursor.fetchone())
 
 
-def update_notification_response_status(notification_id: int, primary_admin: bool, conn: psycopg2.extensions.connection) -> None:
+def update_notification_response_status(notification_id: int, conn: psycopg2.extensions.connection) -> None:
     cursor = conn.cursor()
 
-    if primary_admin:
-        cursor.execute(
-            f"""
-            UPDATE notifications SET primary_admin_responded = TRUE WHERE notification_id = %s;
-            """,
-            (notification_id,)
-        )
-    else:
-        cursor.execute(
-            f"""
-            UPDATE notifications SET secondary_admin_responded = TRUE WHERE notification_id = %s;
-            """,
-            (notification_id,)
-        )
+    cursor.execute(
+        f"""
+        UPDATE notifications SET admin_responded = TRUE WHERE notification_id = %s;
+        """,
+        (notification_id,)
+    )
 
     conn.commit()

@@ -118,24 +118,28 @@ async def pinging_job(job_data: JobData):
                 conn = db_access.setup_connection(DB_HOST, DB_PORT)
 
                 try:
-                    notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, False), conn)
-                    db_access.delete_job(job_data.job_id, conn)
+                    notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 1), conn)
 
                     send_alert(job_data.mail1, job_data.url, notification_id, True)
+                    db_access.delete_job(job_data.job_id, conn)
+
+                finally:
+                    conn.close()
+                try:
 
                     await asyncio.sleep(job_data.response_time / 1000)
+                    conn = db_access.setup_connection(DB_HOST, DB_PORT)
 
-                    if not db_access.get_notification_by_id(notification_id, conn).primary_admin_responded:
-                        send_alert(job_data.mail2, job_data.url, notification_id, False)
+                    if not (xd:=db_access.get_notification_by_id(notification_id, conn)).admin_responded:
+                        print(xd)
+                        second_notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 2), conn)
+                        send_alert(job_data.mail2, job_data.url, second_notification_id, False)
 
                         await asyncio.sleep(job_data.response_time / 1000)
 
                         # Check if the secondary admin has responded and log the result
-                            
-                    db_access.delete_notification(notification_id, conn)
                 finally:
                     conn.close()
-
                 return
 
         await asyncio.sleep(job_data.period / 1000)
