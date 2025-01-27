@@ -55,6 +55,11 @@ def scrap_ack_url(mail_content: str) -> str:
         return ""
 
 
+def clear_db():
+    # todo
+    pass
+
+
 class MailServer:
     def __init__(self, host="localhost", port=587):
         self.host = host
@@ -131,6 +136,15 @@ class MockServiceHandle:
     
     def respond_404(self):
         self._set_mode("404")
+
+    def get_pings_received(self) -> int:
+        resp = requests.get(f"http://localhost:{self.port}/get_pings_received")
+        success = 200 <= resp.status_code < 300
+        if not success:
+            log_net(warn, f"failed to get number of pings received", "mock_service", self.port)
+        else:
+            log_net(info, f"got number of pings received", "mock_service", self.port)
+        return int(resp.text)
 
 
 @dataclass
