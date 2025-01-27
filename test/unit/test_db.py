@@ -100,38 +100,14 @@ def test_db_access_get_jobs(postgresql):
     assert job2.response_time == 31
 
 
-def test_db_access_delete_notification(postgresql):
-    setup_db(postgresql)
-
-    cursor = postgresql.cursor()
-    cursor.execute("INSERT INTO notifications VALUES (DEFAULT, CURRENT_TIMESTAMP, FALSE, FALSE);")
-    cursor.execute("INSERT INTO notifications VALUES (DEFAULT, CURRENT_TIMESTAMP, FALSE, FALSE);")
-    postgresql.commit()
-
-    cursor.execute("SELECT notification_id FROM notifications;")
-    notifications_before = cursor.fetchall()
-    assert len(notifications_before) == 2
-
-    id_to_delete = notifications_before[0][0]
-
-    db_access.delete_notification(id_to_delete, postgresql)
-
-    cursor.execute("SELECT notification_id FROM notifications;")
-    notifications_after = cursor.fetchall()
-    assert len(notifications_after) == 1
-    assert notifications_after[0][0] != id_to_delete
-
-    cursor.close()
-
-
 def test_db_access_save_notification(postgresql):
     setup_db(postgresql)
 
     notification = NotificationData(
         notification_id=-1,
         time_sent=datetime.now(),
-        primary_admin_responded=False,
-        secondary_admin_responded=False
+        admin_responded=False,
+        notification_num=1
     )
 
     notification_id = db_access.save_notification(notification, postgresql)
@@ -148,15 +124,15 @@ def test_db_access_get_notification_by_id(postgresql):
     setup_db(postgresql)
 
     cursor = postgresql.cursor()
-    cursor.execute("INSERT INTO notifications VALUES (0, CURRENT_TIMESTAMP, FALSE, FALSE);")
-    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, TRUE);")
-    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, FALSE);")
+    cursor.execute("INSERT INTO notifications VALUES (0, CURRENT_TIMESTAMP, FALSE, 1);")
+    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, 2);")
+    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, 1);")
     postgresql.commit()
 
     notification = db_access.get_notification_by_id(1, postgresql)
 
-    assert notification.primary_admin_responded == True
-    assert notification.secondary_admin_responded == True
+    assert notification.admin_responded == True
+    assert notification.notification_num == 2
 
 
 def test_db_access_udate_notification_response_status1(postgresql):
@@ -165,34 +141,14 @@ def test_db_access_udate_notification_response_status1(postgresql):
     notification_id = 0
 
     cursor = postgresql.cursor()
-    cursor.execute(f"INSERT INTO notifications VALUES ({notification_id}, CURRENT_TIMESTAMP, FALSE, FALSE);")
-    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, TRUE);")
-    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, FALSE);")
+    cursor.execute(f"INSERT INTO notifications VALUES ({notification_id}, CURRENT_TIMESTAMP, FALSE, 1);")
+    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, 1);")
+    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, 2);")
     postgresql.commit()
 
-    db_access.update_notification_response_status(notification_id, True, postgresql)
+    db_access.update_notification_response_status(notification_id, postgresql)
 
-    cursor.execute(f"SELECT primary_admin_responded FROM notifications WHERE notification_id = {notification_id};")
-    result = cursor.fetchone()
-
-    assert result is not None
-    assert result[0] == True
-
-
-def test_db_access_udate_notification_response_status2(postgresql):
-    setup_db(postgresql)
-
-    notification_id = 0
-
-    cursor = postgresql.cursor()
-    cursor.execute(f"INSERT INTO notifications VALUES ({notification_id}, CURRENT_TIMESTAMP, FALSE, FALSE);")
-    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, TRUE);")
-    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, TRUE, FALSE);")
-    postgresql.commit()
-
-    db_access.update_notification_response_status(notification_id, False, postgresql)
-
-    cursor.execute(f"SELECT secondary_admin_responded FROM notifications WHERE notification_id = {notification_id};")
+    cursor.execute(f"SELECT admin_responded FROM notifications WHERE notification_id = {notification_id};")
     result = cursor.fetchone()
 
     assert result is not None
