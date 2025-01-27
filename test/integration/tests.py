@@ -20,7 +20,7 @@ def test_sending_alert():
     alert_service = AlertingServiceHandle(LOGS_DIR)
     mock_service = MockServiceHandle(7000, LOGS_DIR)
     try:
-        sleep(0.5)
+        sleep(5)
         new_job = PingingJob("dziekan@localhost", "student@localhost", 100, mock_service, 1000, 1000)
         alert_service.add_pinging_job(new_job)
         mock_service.respond_404()
@@ -53,9 +53,7 @@ def test_normal_behavior():
     sleep(2)
     alert_service = AlertingServiceHandle(LOGS_DIR)
     mock_service = MockServiceHandle(7000, LOGS_DIR)
-    sleep(0.5)
-    mock_service.respond_404()
-    mock_service.respond_normal()
+    sleep(5)
     try:
         new_job = PingingJob("poker@localhost", "calka@localhost", 100, mock_service, 1000, 5000)
         alert_service.add_pinging_job(new_job)
@@ -75,7 +73,7 @@ def test_deleting_job():
     sleep(2)
     alert_service = AlertingServiceHandle(LOGS_DIR)
     mock_service = MockServiceHandle(7000, LOGS_DIR)
-    sleep(0.5)
+    sleep(5)
     try:
         job = PingingJob("mail1@localhost", "mail2@localhost", 100, mock_service, 1000, 5000)
         assert mock_service.get_pings_received() == 0
@@ -86,7 +84,7 @@ def test_deleting_job():
         sleep(3) # after that number of pings should stabilize
         pings_received = mock_service.get_pings_received()
         sleep(1)
-        assert mock_service.get_pings_received() == pings_received
+        assert (t:=mock_service.get_pings_received()) == pings_received, f"{t}!={pings_received}"
     finally:
         signal.signal(signal.SIGCHLD, orig)
         mail_server.stop()

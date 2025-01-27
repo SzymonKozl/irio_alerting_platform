@@ -197,10 +197,7 @@ class AlertingServiceHandle:
     def remove_pinging_job(
             self, job_id: int
     ) -> bool:
-        payload = {
-            "job_id": job_id,
-        }
-        resp = requests.delete(f"http://localhost:{self.port}/del_job", json=payload)
+        resp = requests.delete(f"http://localhost:{self.port}/del_job?job_id={job_id}")
         success = 200 <= resp.status_code < 300
         if not success:
             log_net(warn, f"failed to delete ping job with id {job_id}. response code: {resp.status_code}", self.__class__.__name__, self.port)
