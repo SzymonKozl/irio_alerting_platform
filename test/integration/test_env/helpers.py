@@ -13,6 +13,7 @@ from aiosmtpd.controller import Controller
 from aiosmtpd.handlers import Debugging
 from email.message import EmailMessage
 from email import message_from_bytes, policy
+import psycopg2
 
 from test_env.log import log_net
 
@@ -55,9 +56,32 @@ def scrap_ack_url(mail_content: str) -> str:
         return ""
 
 
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASS")
+DB_NAME = os.getenv("DB_NAME")
+DB_HOST = "localhost"
+DB_PORT = 5432
+
+
 def clear_db():
-    # todo
-    pass
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+        )
+
+        cursor = conn.cursor()
+        setup_file = "../../server/db_migrations/v1__setup.sql"
+        with open(setup_file, 'r') as file:
+            sql_script = file.read()
+        cursor.execute(sql_script)
+        conn.commit()
+    except Exception as e:
+        error("error on clearing database: {}".format(e))
+        exit(1)
 
 
 class MailServer:

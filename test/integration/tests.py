@@ -4,7 +4,8 @@ from test_env.helpers import (
     MockServiceHandle,
     PingingJob,
     MailServer,
-    scrap_ack_url
+    scrap_ack_url,
+    clear_db
 )
 import signal
 from time import sleep
@@ -45,6 +46,7 @@ def test_sending_alert():
         mail_server.stop()
         mock_service.close()
         alert_service.close()
+        clear_db()
 
 
 def test_normal_behavior():
@@ -65,6 +67,7 @@ def test_normal_behavior():
         mail_server.stop()
         mock_service.close()
         alert_service.close()
+        clear_db()
 
 
 def test_deleting_job():
@@ -90,6 +93,7 @@ def test_deleting_job():
         mail_server.stop()
         mock_service.close()
         alert_service.close()
+        clear_db()
 
 
 if __name__ == '__main__':
