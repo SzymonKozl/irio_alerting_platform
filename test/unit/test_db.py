@@ -188,3 +188,45 @@ def test_db_access_get_active_job_ids(postgresql):
         for job_pod_id, job in zip(EXAMPLE_JOBS_PODS, EXAMPLE_JOBS):
             if job_pod_id == pod_id and job.is_active:
                 assert job.job_id in job_ids
+
+
+def test_db_access_get_jobs_for_stateful_set(postgresql):
+    setup_db(postgresql)
+    insert_example_jobs(postgresql)
+
+    stateful_set_index = 1
+    jobs = db_access.get_jobs_for_stateful_set(stateful_set_index, postgresql)
+
+    assert len(jobs) == 2
+
+    job1, job2 = jobs
+    assert job1.job_id == 2
+    assert job2.job_id == 3
+
+
+def test_db_access_get_notifications_for_jobs(postgresql):
+    setup_db(postgresql)
+    insert_example_jobs(postgresql)
+
+    cursor = postgresql.cursor()
+    cursor.execute("INSERT INTO notifications VALUES (0, CURRENT_TIMESTAMP, FALSE, 1, 1);")
+    cursor.execute("INSERT INTO notifications VALUES (1, CURRENT_TIMESTAMP, TRUE, 2, 1);")
+    cursor.execute("INSERT INTO notifications VALUES (2, CURRENT_TIMESTAMP, FALSE, 1, 2);")
+    cursor.execute("INSERT INTO notifications VALUES (3, CURRENT_TIMESTAMP, TRUE, 2, 2);")
+    cursor.execute("INSERT INTO notifications VALUES (4, CURRENT_TIMESTAMP, TRUE, 2, 3);")
+    postgresql.commit()
+
+    notifications = db_access.get_notifications_for_jobs([1, 3, 4], postgresql)
+
+    assert len(notifications) == 3
+
+    assert len(notifications[1]) == 2
+    assert len(notifications[3]) == 1
+    assert len(notifications[4]) == 0
+
+    notification_ids_1 = [n.notification_id for n in notifications[1]]
+    assert 0 in notification_ids_1
+    assert 1 in notification_ids_1
+
+    notification_ids_3 = [n.notification_id for n in notifications[3]]
+    assert 4 in notification_ids_3

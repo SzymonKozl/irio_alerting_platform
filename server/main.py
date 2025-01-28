@@ -273,6 +273,46 @@ def handle_SIGINT(signum, frame):
 signal.signal(signal.SIGTERM, handle_SIGINT)
 
 
+async def recover():
+    log_data = {"function_name" : "recover"}
+    logging.info("Recovering jobs", extra={"json_fields" : log_data})
+
+    try:
+      jobs = db_access.get_jobs_for_stateful_set(STATEFUL_SET_INDEX, db_conn)
+    except Exception as e:
+        logging.error("Error getting jobs from database: %s", e, extra={"json_fields" : log_data})
+        return
+    
+    try:
+      notifications = db_access.get_notifications_for_jobs([job.job_id for job in jobs], db_conn)
+    except Exception as e:
+        logging.error("Error getting notifications from database: %s", e, extra={"json_fields" : log_data})
+        return
+
+    pending_notifications_jobs = []
+    active_jobs = []
+
+    for job in jobs:
+        if (len(notifications[job.job_id]) == 1 and
+            notifications[job.job_id][0].notification_num == 1 and
+            not notifications[job.job_id][0].admin_responded):
+              pending_notifications_jobs.append(job)
+        elif job.is_active:
+            # Previous check is needed, because the pod might crash 
+            # after saving the first notification and before setting the job as inactive
+            active_jobs.append(job)
+
+    for job in active_jobs:
+        asyncio.create_task(new_job(job, STATEFUL_SET_INDEX))
+        logging.info("Resumed job", extra={"json_fields" : {**log_data, "job_data" : job._asdict()}})
+    
+    for job in pending_notifications_jobs:
+        # TODO resume notifying
+        pass
+    
+    logging.info("Recovery complete", extra={"json_fields" : log_data})
+
+
 if __name__ == '__main__':
     try:
         setup_logging()
@@ -284,5 +324,7 @@ if __name__ == '__main__':
     except Exception as e:
         logging.error("Error initializing SMTP connection: %s", e,
                       extra={"json_fields" : {"function_name" : "main"}})
+        
+    asyncio.run(recover())
 
     web.run_app(app, host=APP_HOST, port=APP_PORT)
