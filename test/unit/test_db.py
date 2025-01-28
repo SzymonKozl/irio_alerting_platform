@@ -188,3 +188,17 @@ def test_db_access_get_active_job_ids(postgresql):
         for job_pod_id, job in zip(EXAMPLE_JOBS_PODS, EXAMPLE_JOBS):
             if job_pod_id == pod_id and job.is_active:
                 assert job.job_id in job_ids
+
+
+def test_db_access_get_jobs_for_stateful_set(postgresql):
+    setup_db(postgresql)
+    insert_example_jobs(postgresql)
+
+    stateful_set_index = 1
+    jobs = db_access.get_jobs_for_stateful_set(stateful_set_index, postgresql)
+
+    assert len(jobs) == 2
+
+    job1, job2 = jobs
+    assert job1.job_id == 2
+    assert job2.job_id == 3
