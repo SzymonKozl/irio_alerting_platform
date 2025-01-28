@@ -1,5 +1,5 @@
 import os
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Dict
 
 import psycopg2
 
@@ -136,3 +136,20 @@ def get_jobs_for_stateful_set(stateful_set_index: int, conn: psycopg2.extensions
     for row in rows:
         jobs.append(JobData(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[8]))
     return jobs
+
+
+def get_notifications_for_jobs(job_ids: list[job_id_t], conn: psycopg2.extensions.connection) -> Dict[job_id_t, List[NotificationData]]:
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM notifications WHERE job_id = ANY(%s);
+        """,
+        (job_ids,)
+    )
+    rows = cursor.fetchall()
+
+    notifications = {job_id: [] for job_id in job_ids}
+    for row in rows:
+        notification = NotificationData(*row)
+        notifications[notification.job_id].append(notification)
+    return notifications
