@@ -31,6 +31,8 @@ ENV DB_PASS="postgres"
 ENV DB_NAME="irio_test"
 ENV DB_HOST="localhost"
 
+ENV STATEFUL_SET_INDEX="1"
+
 # SMTP credentials
 ARG SMTP_USERNAME=""
 ARG SMTP_PASSWORD=""
