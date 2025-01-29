@@ -16,9 +16,12 @@ spec:
           mountPath: /flyway/conf
         env:
         - name: DB_CONN
-          value: "jdbc:postgresql://gke-pg-cluster-rw.pg-ns:5432/irio" #todo: change db name
+          value: "jdbc:postgresql://gke-pg-cluster-rw.pg-ns:5432/app"
         - name: FLYWAY_USER
-          value: "postgres"
+          valueFrom:
+            secretKeyRef:
+              name: gke-pg-cluster-app
+              key: username
         - name: FLYWAY_PASSWORD
           valueFrom:
             secretKeyRef:
