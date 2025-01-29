@@ -3,6 +3,7 @@ kind: Job
 metadata:
   name: flyway-migrations
 spec:
+  ttlSecondsAfterFinished: 0
   template:
     spec:
       containers:
@@ -31,7 +32,7 @@ spec:
       volumes:
       - name: sql-migrations
         gitRepo:
-          repository: "https://github.com/SzymonKozl/irio_alerting_platform "
+          repository: "https://github.com/SzymonKozl/irio_alerting_platform"
           directory: "server/db_migrations"
       - name: flyway-conf
         configMap:

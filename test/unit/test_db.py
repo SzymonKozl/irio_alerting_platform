@@ -12,7 +12,7 @@ from common import JobData, NotificationData
 
 
 def setup_db(conn):
-    setup_file = server_dir / "db_migrations/v1__setup.sql"
+    setup_file = server_dir / "db_migrations/V1__setup.sql"
     with open(setup_file, 'r') as file:
         sql_script = file.read()
     

@@ -9,6 +9,7 @@ def _optimizations():
     
 def setup_logging():
     try:
+        assert False
         client.setup_logging(log_level=logging.INFO)
         _optimizations()
         # Function names are hardcoded in the log data 
