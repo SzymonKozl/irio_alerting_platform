@@ -106,16 +106,19 @@ def test_recovery():
         sleep(5)
         new_job = PingingJob("dziekan@localhost", "student@localhost", 100, mock_service, 1000, 1000)
         alert_service.add_pinging_job(new_job)
-        sleep(1)
-        signal.signal(signal.SIGCHLD, orig)
+
+        signal.signal(signal.SIGCHLD, lambda signum, frame: None)
         alert_service.close()
+        sleep(1)
         orig = signal.signal(signal.SIGCHLD, handle_child_death)
         alert_service = AlertingServiceHandle(LOGS_DIR)
+
         mock_service.respond_404()
         sleep(3)
         assert mail_server.last_mail_to("dziekan@localhost") is not None
         sleep(1)
         assert mail_server.last_mail_to("student@localhost") is not None
+
     finally:
         signal.signal(signal.SIGCHLD, orig)
         mail_server.stop()
