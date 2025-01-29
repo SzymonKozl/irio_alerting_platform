@@ -1,5 +1,5 @@
 import os
-from typing import Optional, List
+from typing import Optional, List, Set, Dict
 
 import psycopg2
 
@@ -26,11 +26,11 @@ def setup_connection(db_host: str, db_port: int) -> Optional[psycopg2.extensions
     return conn
 
 
-def delete_job(job_id: job_id_t, conn: psycopg2.extensions.connection) -> None:
+def set_job_inactive(job_id: job_id_t, conn: psycopg2.extensions.connection) -> None:
     cursor = conn.cursor()
     cursor.execute(
         f"""
-        DELETE FROM jobs WHERE job_id = %s;
+        UPDATE jobs SET is_active=false WHERE jobs.job_id = %s;
         """,
         (job_id,)
     )
@@ -41,10 +41,10 @@ def save_job(job: JobData, conn: psycopg2.extensions.connection, set_idx: int) -
     cursor = conn.cursor()
     cursor.execute(
         f"""
-        INSERT INTO jobs VALUES (DEFAULT, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO jobs VALUES (DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING job_id;
         """,
-        (job.mail1, job.mail2, job.url, job.period, job.window, job.response_time, set_idx)
+        (job.mail1, job.mail2, job.url, job.period, job.window, job.response_time, set_idx, job.is_active)
     )
     conn.commit()
     return job_id_t(cursor.fetchone()[0])
@@ -62,29 +62,18 @@ def get_jobs(primary_email: str, conn: psycopg2.extensions.connection) -> List[J
 
     jobs = []
     for row in rows:
-        jobs.append(JobData(row[0], row[1], row[2], row[3], row[4], row[5], row[6]))
+        jobs.append(JobData(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[8]))
     return jobs
-
-
-def delete_notification(notification_id: int, conn: psycopg2.extensions.connection) -> None:
-    cursor = conn.cursor()
-    cursor.execute(
-        f"""
-        DELETE FROM notifications WHERE notification_id = %s;
-        """,
-        (notification_id,)
-    )
-    conn.commit()
 
 
 def save_notification(notification: NotificationData, conn: psycopg2.extensions.connection) -> notification_id_t:
     cursor = conn.cursor()
     cursor.execute(
         f"""
-        INSERT INTO notifications VALUES (DEFAULT, %s, %s, %s)
+        INSERT INTO notifications VALUES (DEFAULT, %s, %s, %s, %s)
         RETURNING notification_id;
         """,
-        (notification.time_sent, notification.primary_admin_responded, notification.secondary_admin_responded)
+        (notification.time_sent, notification.admin_responded, notification.notification_num, notification.job_id)
     )
     conn.commit()
     return notification_id_t(cursor.fetchone()[0])
@@ -102,22 +91,65 @@ def get_notification_by_id(notification_id: int, conn: psycopg2.extensions.conne
     return NotificationData(*cursor.fetchone())
 
 
-def update_notification_response_status(notification_id: int, primary_admin: bool, conn: psycopg2.extensions.connection) -> None:
+def update_notification_response_status(notification_id: int, conn: psycopg2.extensions.connection) -> None:
     cursor = conn.cursor()
 
-    if primary_admin:
-        cursor.execute(
-            f"""
-            UPDATE notifications SET primary_admin_responded = TRUE WHERE notification_id = %s;
-            """,
-            (notification_id,)
-        )
-    else:
-        cursor.execute(
-            f"""
-            UPDATE notifications SET secondary_admin_responded = TRUE WHERE notification_id = %s;
-            """,
-            (notification_id,)
-        )
+    cursor.execute(
+        f"""
+        UPDATE notifications SET admin_responded = TRUE WHERE notification_id = %s;
+        """,
+        (notification_id,)
+    )
 
     conn.commit()
+
+
+def get_active_job_ids(conn: psycopg2.extensions.connection, pod_index: int) -> Set[job_id_t]:
+    """
+    :param conn: postgres connection
+    :param pod_index: index of pod
+    :return: list of all active jobs assigned to this pod
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT job_id FROM jobs WHERE is_active = TRUE and stateful_set_index = %s;
+        """,
+        (pod_index,)
+    )
+    conn.commit()
+
+    return {job_id_t(x[0]) for x in cursor.fetchall()}
+
+
+def get_jobs_for_stateful_set(stateful_set_index: int, conn: psycopg2.extensions.connection) -> List[JobData]:
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM jobs WHERE stateful_set_index = %s;
+        """,
+        (stateful_set_index,)
+    )
+    rows = cursor.fetchall()
+    
+    jobs = []
+    for row in rows:
+        jobs.append(JobData(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[8]))
+    return jobs
+
+
+def get_notifications_for_jobs(job_ids: list[job_id_t], conn: psycopg2.extensions.connection) -> Dict[job_id_t, List[NotificationData]]:
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM notifications WHERE job_id = ANY(%s);
+        """,
+        (job_ids,)
+    )
+    rows = cursor.fetchall()
+
+    notifications = {job_id: [] for job_id in job_ids}
+    for row in rows:
+        notification = NotificationData(*row)
+        notifications[notification.job_id].append(notification)
+    return notifications

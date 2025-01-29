@@ -1,0 +1,46 @@
+FROM python:3.11-slim-bookworm
+
+# non interactive postgres installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install PostgreSQL client and dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql \
+    postgresql-client \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ADD . /app/
+
+WORKDIR app
+
+# move to tests dir
+WORKDIR test/integration
+RUN pip install -r test_env/requirements.txt
+
+# postgres setup
+# Set environment variable for PostgreSQL data directory
+ENV PGDATA=/var/lib/postgresql/data
+
+# Initialize the database and change the default password for postgres user
+RUN service postgresql start \
+    && su - postgres -c "psql -c \"ALTER USER postgres PASSWORD 'postgres';\"" \
+    && su - postgres -c "psql -c \"CREATE DATABASE irio_test\"" \
+    && su - postgres -c "psql -d irio_test -f /app/server/db_migrations/v1__setup.sql"
+ENV DB_USER="postgres"
+ENV DB_PASS="postgres"
+ENV DB_NAME="irio_test"
+
+# SMTP credentials
+ARG SMTP_USERNAME=""
+ARG SMTP_PASSWORD=""
+ARG SMTP_SERVER=""
+ARG SMTP_PORT=""
+
+ENV SMTP_USERNAME=$SMTP_USERNAME
+ENV SMTP_PASSWORD=$SMTP_PASSWORD
+ENV SMTP_SERVER=$SMTP_SERVER
+ENV SMTP_PORT=$SMTP_PORT
+
+# install alerting platform dependencties
+RUN pip install -r ../../server/requirements.txt
+CMD service postgresql start && python tests.py

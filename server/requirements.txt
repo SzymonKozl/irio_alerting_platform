@@ -1,3 +1,5 @@
-psycopg2
+psycopg2-binary
 aiohttp
+google-cloud-logging
+aiohttp-swagger
 prometheus-client

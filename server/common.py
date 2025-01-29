@@ -4,8 +4,8 @@ import os
 
 job_id_t = int
 notification_id_t = int
-JobData = namedtuple("JobData", ["job_id", "mail1", "mail2", "url", "period", "window", "response_time"])
-NotificationData = namedtuple("NotificationData", ["notification_id", "time_sent", "primary_admin_responded", "secondary_admin_responded"])
+JobData = namedtuple("JobData", ["job_id", "mail1", "mail2", "url", "period", "window", "response_time", "is_active"])
+NotificationData = namedtuple("NotificationData", ["notification_id", "time_sent", "admin_responded", "notification_num", "job_id"])
 
 
 DB_HOST = os.environ.get("DB_HOST")

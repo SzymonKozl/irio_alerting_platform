@@ -1,0 +1,38 @@
+name: Run Tests on Pull Request to Dev
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t alerting-platform-integration:test -f Dockerfile_integration  --build-arg SMTP_USERNAME="alertingplatformirio@localhost"  --build-arg SMTP_SERVER="localhost" --build-arg SMTP_PORT="1025" .
+
+      - name: Create log directory
+        run: mkdir -p logs
+
+      - name: Run tests
+        run: |
+          docker run --rm -v ${{ github.workspace }}/logs:/app/logs alerting-platform-integration:test
+
+      - name: Upload logs
+        if: failure() # Only upload logs if the job fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: logs/
+
+      - name: Clean up Docker
+        run: docker system prune -f
