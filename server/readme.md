@@ -8,4 +8,4 @@ Environment variables:
 - `SMTP_USERNAME`: alerting platform email
 - `SMTP_PASSWORD`: alerting platform email password
 - `SMTP_SERVER`: mailing service address (`"smtp.gmail.com"` if not provided)
-- `SMTP_PORR`: mailing service address (`"587"` if not provided)
+- `SMTP_PORT`: mailing service address (`"587"` if not provided)
