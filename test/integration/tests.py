@@ -4,7 +4,8 @@ from test_env.helpers import (
     MockServiceHandle,
     PingingJob,
     MailServer,
-    scrap_ack_url
+    scrap_ack_url,
+    clear_db
 )
 import signal
 from time import sleep
@@ -20,7 +21,7 @@ def test_sending_alert():
     alert_service = AlertingServiceHandle(LOGS_DIR)
     mock_service = MockServiceHandle(7000, LOGS_DIR)
     try:
-        sleep(0.5)
+        sleep(5)
         new_job = PingingJob("dziekan@localhost", "student@localhost", 100, mock_service, 1000, 1000)
         alert_service.add_pinging_job(new_job)
         mock_service.respond_404()
@@ -40,17 +41,12 @@ def test_sending_alert():
         alert_service.confirm_alert(ack_link)
         sleep(5)
         assert mail_server.last_mail_to("sesja@localhost") is None
-    except AssertionError as e:
+    finally:
         signal.signal(signal.SIGCHLD, orig)
         mail_server.stop()
         mock_service.close()
         alert_service.close()
-        raise e
-    else:
-        signal.signal(signal.SIGCHLD, orig)
-        mail_server.stop()
-        mock_service.close()
-        alert_service.close()
+        clear_db()
 
 
 def test_normal_behavior():
@@ -59,32 +55,52 @@ def test_normal_behavior():
     sleep(2)
     alert_service = AlertingServiceHandle(LOGS_DIR)
     mock_service = MockServiceHandle(7000, LOGS_DIR)
-    sleep(0.5)
-    mock_service.respond_404()
-    mock_service.respond_normal()
+    sleep(5)
     try:
         new_job = PingingJob("poker@localhost", "calka@localhost", 100, mock_service, 1000, 5000)
         alert_service.add_pinging_job(new_job)
         sleep(10)
         assert mail_server.last_mail_to("poker@localhost") is None
         assert mail_server.last_mail_to("calka@localhost") is None
-    except AssertionError as e:
+    finally:
         signal.signal(signal.SIGCHLD, orig)
         mail_server.stop()
         mock_service.close()
         alert_service.close()
-        raise e
-    else:
+        clear_db()
+
+
+def test_deleting_job():
+    orig = signal.signal(signal.SIGCHLD, handle_child_death)
+    mail_server = MailServer(port=1025)
+    sleep(2)
+    alert_service = AlertingServiceHandle(LOGS_DIR)
+    mock_service = MockServiceHandle(7000, LOGS_DIR)
+    sleep(5)
+    try:
+        job = PingingJob("mail1@localhost", "mail2@localhost", 100, mock_service, 1000, 5000)
+        assert mock_service.get_pings_received() == 0
+        job_id = alert_service.add_pinging_job(job)
+        sleep(1)
+        assert mock_service.get_pings_received() > 0
+        alert_service.remove_pinging_job(job_id)
+        sleep(3) # after that number of pings should stabilize
+        pings_received = mock_service.get_pings_received()
+        sleep(1)
+        assert (t:=mock_service.get_pings_received()) == pings_received, f"{t}!={pings_received}"
+    finally:
         signal.signal(signal.SIGCHLD, orig)
         mail_server.stop()
         mock_service.close()
         alert_service.close()
+        clear_db()
 
 
 if __name__ == '__main__':
 
     test_sending_alert()
-    sleep(1)
+    sleep(0.5)
     test_normal_behavior()
-    sleep(2)
+    sleep(0.5)
+    test_deleting_job()
     exit(0)

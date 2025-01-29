@@ -1,16 +1,17 @@
-import sys
 from asyncio import sleep
-from traceback import print_tb
 
 from aiohttp import web
 from aiohttp.web import GracefulExit
 from sys import argv, exit, stderr, stdout
 import signal
-import os
+from threading import Lock
 
 
 response_mode = 'normal'
 response_modes = {'normal', 'timeout', '404'}
+
+pings_ctr_lock = Lock()
+pings_ctr = 0
 
 
 def panic(where: str, reason: str) -> None:
@@ -20,6 +21,12 @@ def panic(where: str, reason: str) -> None:
     stderr.write(f"{reason}\n")
     raise GracefulExit()
 
+
+async def get_num_of_pings(request: web.Request) -> web.Response:
+    global pings_ctr_lock
+    with pings_ctr_lock:
+        val = pings_ctr
+    return web.Response(text=str(val))
 
 async def set_response_mode(request: web.Request) -> web.Response:
     global response_mode
@@ -34,6 +41,9 @@ async def set_response_mode(request: web.Request) -> web.Response:
 
 
 async def pinging_endpoint(request: web.Request) -> web.Response:
+    global pings_ctr, pings_ctr_lock
+    with pings_ctr_lock:
+        pings_ctr += 1
     match response_mode:
         case 'normal':
             return web.Response(status=200, text='hello world')
@@ -47,6 +57,7 @@ async def pinging_endpoint(request: web.Request) -> web.Response:
 
 
 app = web.Application()
+app.router.add_get('/get_pings_received', get_num_of_pings)
 app.router.add_post('/set_response_mode', set_response_mode)
 app.router.add_get('/pinging_endpoint', pinging_endpoint)
 

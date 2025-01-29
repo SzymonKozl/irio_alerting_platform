@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: flyway-migrations
+spec:
+  template:
+    spec:
+      containers:
+      - name: flyway
+        image: redgate/flyway
+        args: ["baseline"]
+        volumeMounts:
+        - name: flyway-conf
+          mountPath: /flyway/conf
+        env:
+        - name: DB_CONN
+          value: "jdbc:postgresql://gke-pg-cluster-rw.pg-ns:5432/irio" #todo: change db name
+        - name: FLYWAY_USER
+          value: "postgres"
+        - name: FLYWAY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: gke-pg-cluster-app
+              key: password
+      restartPolicy: Never
+      volumes:
+      - name: flyway-conf
+        configMap:
+          name: flyway-conf
+  backoffLimit: 4

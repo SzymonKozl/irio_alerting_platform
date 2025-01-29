@@ -8,7 +8,7 @@ import logging
 
 from common import *
 import db_access
-from coroutines import delete_job, new_job, init_smtp
+from coroutines import new_job, init_smtp, continue_notifications
 from logging_setup import setup_logging
 
 STATEFUL_SET_INDEX = 1 # todo: set to real value
@@ -93,15 +93,15 @@ async def add_service(request: web.Request):
                       extra={"json_fields" : log_data})
         return web.json_response({'error': ERR_MSG_CREATE_POSITIVE_INT}, status=400)
 
-    job_data = JobData(-1, mail1, mail2, url ,period, alerting_window, response_time)
+    job_data = JobData(-1, mail1, mail2, url ,period, alerting_window, response_time, True)
     try:
         job_id = db_access.save_job(job_data, db_conn, STATEFUL_SET_INDEX)
     except Exception as e:
         logging.error("Error saving job to database: %s", e, 
                       extra={"json_fields" : {**log_data, "job_data" : job_data._asdict()}})
         return web.json_response({'error': str(e)}, status=501)
-    job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time)
-    asyncio.create_task(new_job(job_data))
+    job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time, True)
+    asyncio.create_task(new_job(job_data, STATEFUL_SET_INDEX))
 
     logging.info("Service added", 
                  extra={"json_fields" : {**log_data, "job_data" : job_data._asdict()}})
@@ -155,7 +155,7 @@ async def receive_alert(request: web.Request):
 
     log_data.update({"notification_id": notification_id, "primary_admin": primary_admin})
     try:
-        db_access.update_notification_response_status(notification_id, primary_admin, db_conn)
+        db_access.update_notification_response_status(notification_id, db_conn)
     except Exception as e:
         logging.error("Error updating alert response status: %s", e, 
                       extra={"json_fields" : log_data})
@@ -249,16 +249,100 @@ async def del_job(request: web.Request):
         
     log_data["job_id"] = job_id
     try:
-        db_access.delete_job(job_id, db_conn)
+        db_access.set_job_inactive(int(job_id), db_conn)
     except Exception as e:
         logging.error("Error deleting job from database: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=500)
-    asyncio.create_task(delete_job(job_id))
     logging.info("Job deleted", extra={"json_fields" : log_data})
     return web.json_response({'success': True}, status=200)
 
 
+async def recover_jobs():
+    log_data = {"function_name" : "recover_jobs"}
+    logging.info("Recovering jobs", extra={"json_fields" : log_data})
+
+    try:
+      jobs = db_access.get_jobs_for_stateful_set(STATEFUL_SET_INDEX, db_conn)
+    except Exception as e:
+        logging.error("Error getting jobs from database: %s", e, extra={"json_fields" : log_data})
+        return
+    
+    job_dict = {job.job_id: job for job in jobs}
+
+    active_jobs_ids = [job.job_id for job in jobs if job.is_active]
+    inactive_jobs_ids = [job.job_id for job in jobs if not job.is_active]
+
+    # active_jobs, inactive_jobs_ids = [], []
+    # for job in jobs:
+    #   if job.is_active:
+    #     active_jobs.append(job)
+    #   else:
+    #     inactive_jobs_ids.append(job.job_id)
+
+    try:
+      notifications = db_access.get_notifications_for_jobs(inactive_jobs_ids, db_conn)
+    except Exception as e:
+        logging.error("Error getting notifications from database: %s", e, extra={"json_fields" : log_data})
+        return
+
+    pending_notifications_jobs_ids = [
+      job_id for job_id in inactive_jobs_ids
+      # if previously the pod crashed after sending an alert, but before setting the job
+      # as inactive, there can be multiple notifications for the primary admin
+      if notifications[job_id] and all(
+        notification.notification_num == 1 and not notification.admin_responded
+        for notification in notifications[job_id]
+      )
+    ]
+
+    # active_jobs = []
+
+    # for job in inactive_jobs:
+    #   if notifications[job.job_id]:
+    #     # get newest notification
+    #     notification = max(notifications[job.job_id], key=lambda x: x.time_sent)
+    #     if notification.notification_num == 1 and not notification.admin_responded:
+    #       pending_notifications_jobs.append(job)
+
+    # # inactive jobs
+    # for job in 
+
+    # for job, notifications in notifications.items():
+    #     if notifications:
+    #         notification = max(notifications, key=lambda x: x.time_sent)
+    #         if notification.notification_num == 1 and not notification.admin_responded:
+    #             pending_notifications_jobs.append(job)
+
+
+    # for job in jobs:
+    #     if (len(notifications[job.job_id]) == 1 and
+    #         notifications[job.job_id][0].notification_num == 1 and
+    #         not notifications[job.job_id][0].admin_responded):
+    #           pending_notifications_jobs.append(job)
+    #     elif job.is_active:
+    #         # Previous check is needed, because the pod might crash 
+    #         # after saving the first notification and before setting the job as inactive
+    #         active_jobs.append(job)
+    for job_id in active_jobs_ids:
+        job = job_dict[job_id]
+        asyncio.create_task(new_job(job, STATEFUL_SET_INDEX))
+        logging.info("Resumed job", extra={"json_fields" : {**log_data, "job_data" : job._asdict()}})
+    logging.info("Resumed all jobs", extra={"json_fields" : log_data})
+
+    for job_id in pending_notifications_jobs_ids:
+        job = job_dict[job_id]
+        # get newest notification
+        notification = max(notifications[job.job_id], key=lambda x: x.time_sent)
+        asyncio.create_task(continue_notifications(job, notification))
+        logging.info("Resumed job notifying", extra={"json_fields" : {**log_data, "job_data" : job._asdict()}})
+    logging.info("Resumed all job notifications", extra={"json_fields" : log_data})
+
+async def recover(app):
+    asyncio.create_task(recover_jobs())
+
+
 app = web.Application()
+app.on_startup.append(recover)
 app.router.add_post('/add_service', add_service)
 app.router.add_get('/receive_alert', receive_alert)
 app.router.add_get('/alerting_jobs', get_alerting_jobs)

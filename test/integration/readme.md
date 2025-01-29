@@ -5,9 +5,11 @@
 
 ## Running locally
 ```bash
-docker build --tag irio_alerting
+docker build -f Dockerfile_integration -t irio_test:latest . --build-arg SMTP_USERNAME="alertingplatformirio@localhost"  --build-arg SMTP_SERVER="localhost" --build-arg SMTP_PORT="1025"
 ```
+Create directory 'logs'
 And then
 ```bash
-docker run 'irio_alerting'
+docker run 'irio_alerting' --vm logs:/app/logs
 ```
+NOTE: in my local env tests are failing due to the `setup_logging()` function being stuck. temp workaround: add `assert False` after `try:` line in that function

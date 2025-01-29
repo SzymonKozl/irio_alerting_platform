@@ -13,6 +13,7 @@ from aiosmtpd.controller import Controller
 from aiosmtpd.handlers import Debugging
 from email.message import EmailMessage
 from email import message_from_bytes, policy
+import psycopg2
 
 from test_env.log import log_net
 
@@ -53,6 +54,34 @@ def scrap_ack_url(mail_content: str) -> str:
     except Exception as e:
         error(f"notification id could not be scrapped from email {e}")
         return ""
+
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASS")
+DB_NAME = os.getenv("DB_NAME")
+DB_HOST = "localhost"
+DB_PORT = 5432
+
+
+def clear_db():
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+        )
+
+        cursor = conn.cursor()
+        setup_file = "../../server/db_migrations/v1__setup.sql"
+        with open(setup_file, 'r') as file:
+            sql_script = file.read()
+        cursor.execute(sql_script)
+        conn.commit()
+    except Exception as e:
+        error("error on clearing database: {}".format(e))
+        exit(1)
 
 
 class MailServer:
@@ -132,6 +161,15 @@ class MockServiceHandle:
     def respond_404(self):
         self._set_mode("404")
 
+    def get_pings_received(self) -> int:
+        resp = requests.get(f"http://localhost:{self.port}/get_pings_received")
+        success = 200 <= resp.status_code < 300
+        if not success:
+            log_net(warn, f"failed to get number of pings received", "mock_service", self.port)
+        else:
+            log_net(info, f"got number of pings received", "mock_service", self.port)
+        return int(resp.text)
+
 
 @dataclass
 class PingingJob:
@@ -183,10 +221,7 @@ class AlertingServiceHandle:
     def remove_pinging_job(
             self, job_id: int
     ) -> bool:
-        payload = {
-            "job_id": job_id,
-        }
-        resp = requests.delete(f"http://localhost:{self.port}/del_job", json=payload)
+        resp = requests.delete(f"http://localhost:{self.port}/del_job?job_id={job_id}")
         success = 200 <= resp.status_code < 300
         if not success:
             log_net(warn, f"failed to delete ping job with id {job_id}. response code: {resp.status_code}", self.__class__.__name__, self.port)
