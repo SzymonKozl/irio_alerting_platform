@@ -52,12 +52,12 @@ def send_email(to: str, subject: str, body: str):
         raise e
 
 
-def send_alert(to: str, url: str, notification_id: int, primary_admin: bool):
+def send_alert(to: str, url: str, notification_id: int):
     log_data = {"function_name": "send_alert", "to": to, "url": url,
-                "notification_id": notification_id, "primary_admin": primary_admin}
+                "notification_id": notification_id}
     logging.info("Send alert called", extra={"json_fields": log_data})
 
-    link = f"http://{APP_HOST}:{APP_PORT}/receive_alert?notification_id={notification_id}&primary_admin={primary_admin}"
+    link = f"http://{APP_HOST}:{APP_PORT}/receive_alert?notification_id={notification_id}"
     subject = "Alert"
     body = f"Alert for {url}. Click {link} to acknowledge."
     send_email(to, subject, body)
@@ -129,7 +129,7 @@ async def pinging_task(job_data: JobData, pod_index: int):
                     notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 1, job_data.job_id), conn)
                     JOBS_ACTIVE_CTR.dec()
 
-                    send_alert(job_data.mail1, job_data.url, notification_id, True)
+                    send_alert(job_data.mail1, job_data.url, notification_id)
                     db_access.set_job_inactive(job_data.job_id, conn)
 
                 finally:
@@ -141,7 +141,7 @@ async def pinging_task(job_data: JobData, pod_index: int):
 
                     if not db_access.get_notification_by_id(notification_id, conn).admin_responded:
                         second_notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 2, job_data.job_id), conn)
-                        send_alert(job_data.mail2, job_data.url, second_notification_id, False)
+                        send_alert(job_data.mail2, job_data.url, second_notification_id)
 
                         await asyncio.sleep(job_data.response_time / 1000)
 
