@@ -38,11 +38,18 @@ def send_email(to: str, subject: str, body: str):
     try:
         logging.info("Email sent", extra={"json_fields": log_data})
         smtp = smtplib.SMTP(smtp_server, smtp_port)
-        smtp.starttls()
-        smtp.login(smtp_username, smtp_password)
+        try:
+            smtp.starttls()
+            smtp.login(smtp_username, smtp_password)
+        except Exception as e:
+            if os.getenv("DEBUG") is not None:
+                logging.error(e, extra={"json_fields": log_data})
+            else:
+                raise e
         smtp.sendmail(smtp_username, to, msg.as_string())
     except Exception as e:
         logging.error(f"Error sending email: {e}", extra={"json_fields": log_data})
+        raise e
 
 
 def send_alert(to: str, url: str, notification_id: int, primary_admin: bool):

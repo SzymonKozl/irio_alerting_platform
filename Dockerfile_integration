@@ -32,6 +32,7 @@ ENV DB_NAME="irio_test"
 ENV DB_HOST="localhost"
 
 ENV STATEFUL_SET_INDEX="1"
+ENV DEBUG="1"
 
 # SMTP credentials
 ARG SMTP_USERNAME=""
