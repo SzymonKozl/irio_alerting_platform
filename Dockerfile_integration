@@ -29,6 +29,7 @@ RUN service postgresql start \
 ENV DB_USER="postgres"
 ENV DB_PASS="postgres"
 ENV DB_NAME="irio_test"
+ENV DB_HOST="localhost"
 
 # SMTP credentials
 ARG SMTP_USERNAME=""
