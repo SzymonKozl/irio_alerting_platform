@@ -1,3 +1,5 @@
+import os
+
 from aiohttp import web
 import asyncio
 from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
@@ -7,7 +9,7 @@ from common import *
 import db_access
 from coroutines import delete_job, new_job
 
-STATEFUL_SET_INDEX = 1 # todo: set to real value
+STATEFUL_SET_INDEX = int(os.getenv('STATEFUL_SET_INDEX'))
 
 db_conn = db_access.setup_connection(DB_HOST, DB_PORT)
 

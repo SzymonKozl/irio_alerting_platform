@@ -46,6 +46,10 @@ spec:
             configMapKeyRef:
               name: alerting-app-config
               key: smtp-user
+        - name: POD_INDEX
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
         - name: SMTP_PASSWORD
           valueFrom:
             configMapKeyRef:
