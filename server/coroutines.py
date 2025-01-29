@@ -54,7 +54,7 @@ def send_email(to: str, subject: str, body: str):
 
 def send_alert(to: str, url: str, notification_id: int):
     log_data = {"function_name": "send_alert", "to": to, "url": url,
-                "notification_id": notification_id, "primary_admin": primary_admin}
+                "notification_id": notification_id}
     logging.info("Send alert called", extra={"json_fields": log_data})
 
     link = f"http://{APP_HOST}:{APP_PORT}/receive_alert?notification_id={notification_id}"
