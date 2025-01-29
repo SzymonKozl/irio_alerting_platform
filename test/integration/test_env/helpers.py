@@ -189,8 +189,8 @@ def handle_child_death(signum, frame):
 class AlertingServiceHandle:
     serial_no = 0
     def __init__(self, log_dir: str):
-        log_net(info, "Creating...", "alerting service", 5000)
-        self.port = 5000
+        log_net(info, "Creating...", "alerting service", 8080)
+        self.port = 8080
         self.log_filename = f"{log_dir}/alert-{self.port}-{AlertingServiceHandle.serial_no}.log"
         AlertingServiceHandle.serial_no += 1
         log_file = open(self.log_filename, "a")
