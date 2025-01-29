@@ -155,6 +155,34 @@ async def new_job(job_data: JobData, pod_index: int):
     await pinging_task(job_data, pod_index)
 
 
+async def continue_notifications(job_data: JobData, notification_data: NotificationData):
+    log_data = {"function_name": "continue_notifications", "job_data": job_data._asdict()}
+    logging.info("Continue notifications called", extra={"json_fields": log_data})
+
+    if job_data.is_active:
+        try:
+            conn = db_access.setup_connection(DB_HOST, DB_PORT)
+            db_access.set_job_inactive(job_data.job_id, conn)
+        finally:
+            conn.close()
+    
+    remaining_response_time = notification_data.time_sent.timestamp() * 1000 + job_data.response_time - time.time_ns() / 1_000_000
+
+    try:    
+        await asyncio.sleep(max(0, remaining_response_time / 1000))
+        conn = db_access.setup_connection(DB_HOST, DB_PORT)
+        
+        if not db_access.get_notification_by_id(notification_data.notification_id, conn).admin_responded:
+            second_notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 2, job_data.job_id), conn)
+            send_alert(job_data.mail2, job_data.url, second_notification_id, False)
+            await asyncio.sleep(job_data.response_time / 1000)
+        logging.info("Notifying complete", extra={"json_fields": log_data})
+    except Exception as e:
+        logging.error("Error while sending a second notification: %s", e, extra={"json_fields": log_data})
+    finally:
+        conn.close()
+        
+
 async def active_job_updater_task(pod_index: int):
     global active_jobs_cache, active_jobs_sync_loc
     """

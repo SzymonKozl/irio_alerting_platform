@@ -8,7 +8,7 @@ import logging
 
 from common import *
 import db_access
-from coroutines import new_job, init_smtp
+from coroutines import new_job, init_smtp, continue_notifications
 from logging_setup import setup_logging
 
 STATEFUL_SET_INDEX = 1 # todo: set to real value
@@ -257,24 +257,8 @@ async def del_job(request: web.Request):
     return web.json_response({'success': True}, status=200)
 
 
-app = web.Application()
-app.router.add_post('/add_service', add_service)
-app.router.add_get('/receive_alert', receive_alert)
-app.router.add_get('/alerting_jobs', get_alerting_jobs)
-app.router.add_delete('/del_job', del_job)
-setup_swagger(app, swagger_url="/api/doc", title="Alerting Platform API", description="API Documentation")
-
-
-def handle_SIGINT(signum, frame):
-    os.close(sys.stdout.fileno())
-    raise GracefulExit()
-
-
-signal.signal(signal.SIGTERM, handle_SIGINT)
-
-
-async def recover():
-    log_data = {"function_name" : "recover"}
+async def recover_jobs():
+    log_data = {"function_name" : "recover_jobs"}
     logging.info("Recovering jobs", extra={"json_fields" : log_data})
 
     try:
@@ -307,10 +291,29 @@ async def recover():
         logging.info("Resumed job", extra={"json_fields" : {**log_data, "job_data" : job._asdict()}})
     
     for job in pending_notifications_jobs:
-        # TODO resume notifying
-        pass
+        asyncio.create_task(continue_notifications(job, notifications[job.job_id][0]))
+        logging.info("Resumed notifying", extra={"json_fields" : {**log_data, "job_data" : job._asdict()}})
     
-    logging.info("Recovery complete", extra={"json_fields" : log_data})
+
+async def recover(app):
+    asyncio.create_task(recover_jobs())
+
+
+app = web.Application()
+app.on_startup.append(recover)
+app.router.add_post('/add_service', add_service)
+app.router.add_get('/receive_alert', receive_alert)
+app.router.add_get('/alerting_jobs', get_alerting_jobs)
+app.router.add_delete('/del_job', del_job)
+setup_swagger(app, swagger_url="/api/doc", title="Alerting Platform API", description="API Documentation")
+
+
+def handle_SIGINT(signum, frame):
+    os.close(sys.stdout.fileno())
+    raise GracefulExit()
+
+
+signal.signal(signal.SIGTERM, handle_SIGINT)
 
 
 if __name__ == '__main__':
@@ -324,7 +327,5 @@ if __name__ == '__main__':
     except Exception as e:
         logging.error("Error initializing SMTP connection: %s", e,
                       extra={"json_fields" : {"function_name" : "main"}})
-        
-    asyncio.run(recover())
 
     web.run_app(app, host=APP_HOST, port=APP_PORT)
