@@ -25,7 +25,7 @@ ENV PGDATA=/var/lib/postgresql/data
 RUN service postgresql start \
     && su - postgres -c "psql -c \"ALTER USER postgres PASSWORD 'postgres';\"" \
     && su - postgres -c "psql -c \"CREATE DATABASE irio_test\"" \
-    && su - postgres -c "psql -d irio_test -f /app/server/db_migrations/V1__setup.sql"
+    && su - postgres -c "psql -d irio_test -f /app/server/db_migrations/V2__setup.sql"
 ENV DB_USER="postgres"
 ENV DB_PASS="postgres"
 ENV DB_NAME="irio_test"
