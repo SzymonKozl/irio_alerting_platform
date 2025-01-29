@@ -172,7 +172,8 @@ async def continue_notifications(job_data: JobData, notification_data: Notificat
         await asyncio.sleep(max(0, remaining_response_time / 1000))
         conn = db_access.setup_connection(DB_HOST, DB_PORT)
         
-        if not db_access.get_notification_by_id(notification_data.notification_id, conn).admin_responded:
+        notifications = db_access.get_notifications_for_jobs([job_data.job_id], conn)[job_data.job_id]
+        if not any(notification.admin_responded for notification in notifications):
             second_notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 2, job_data.job_id), conn)
             send_alert(job_data.mail2, job_data.url, second_notification_id, False)
             await asyncio.sleep(job_data.response_time / 1000)

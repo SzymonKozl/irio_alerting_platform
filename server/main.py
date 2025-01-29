@@ -267,33 +267,75 @@ async def recover_jobs():
         logging.error("Error getting jobs from database: %s", e, extra={"json_fields" : log_data})
         return
     
+    job_dict = {job.job_id: job for job in jobs}
+
+    active_jobs_ids = [job.job_id for job in jobs if job.is_active]
+    inactive_jobs_ids = [job.job_id for job in jobs if not job.is_active]
+
+    # active_jobs, inactive_jobs_ids = [], []
+    # for job in jobs:
+    #   if job.is_active:
+    #     active_jobs.append(job)
+    #   else:
+    #     inactive_jobs_ids.append(job.job_id)
+
     try:
-      notifications = db_access.get_notifications_for_jobs([job.job_id for job in jobs], db_conn)
+      notifications = db_access.get_notifications_for_jobs(inactive_jobs_ids, db_conn)
     except Exception as e:
         logging.error("Error getting notifications from database: %s", e, extra={"json_fields" : log_data})
         return
 
-    pending_notifications_jobs = []
-    active_jobs = []
+    pending_notifications_jobs_ids = [
+      job_id for job_id in inactive_jobs_ids
+      # if previously the pod crashed after sending an alert, but before setting the job
+      # as inactive, there can be multiple notifications for the primary admin
+      if notifications[job_id] and all(
+        notification.notification_num == 1 and not notification.admin_responded
+        for notification in notifications[job_id]
+      )
+    ]
 
-    for job in jobs:
-        if (len(notifications[job.job_id]) == 1 and
-            notifications[job.job_id][0].notification_num == 1 and
-            not notifications[job.job_id][0].admin_responded):
-              pending_notifications_jobs.append(job)
-        elif job.is_active:
-            # Previous check is needed, because the pod might crash 
-            # after saving the first notification and before setting the job as inactive
-            active_jobs.append(job)
+    # active_jobs = []
 
-    for job in active_jobs:
+    # for job in inactive_jobs:
+    #   if notifications[job.job_id]:
+    #     # get newest notification
+    #     notification = max(notifications[job.job_id], key=lambda x: x.time_sent)
+    #     if notification.notification_num == 1 and not notification.admin_responded:
+    #       pending_notifications_jobs.append(job)
+
+    # # inactive jobs
+    # for job in 
+
+    # for job, notifications in notifications.items():
+    #     if notifications:
+    #         notification = max(notifications, key=lambda x: x.time_sent)
+    #         if notification.notification_num == 1 and not notification.admin_responded:
+    #             pending_notifications_jobs.append(job)
+
+
+    # for job in jobs:
+    #     if (len(notifications[job.job_id]) == 1 and
+    #         notifications[job.job_id][0].notification_num == 1 and
+    #         not notifications[job.job_id][0].admin_responded):
+    #           pending_notifications_jobs.append(job)
+    #     elif job.is_active:
+    #         # Previous check is needed, because the pod might crash 
+    #         # after saving the first notification and before setting the job as inactive
+    #         active_jobs.append(job)
+    for job_id in active_jobs_ids:
+        job = job_dict[job_id]
         asyncio.create_task(new_job(job, STATEFUL_SET_INDEX))
         logging.info("Resumed job", extra={"json_fields" : {**log_data, "job_data" : job._asdict()}})
-    
-    for job in pending_notifications_jobs:
-        asyncio.create_task(continue_notifications(job, notifications[job.job_id][0]))
-        logging.info("Resumed notifying", extra={"json_fields" : {**log_data, "job_data" : job._asdict()}})
-    
+    logging.info("Resumed all jobs", extra={"json_fields" : log_data})
+
+    for job_id in pending_notifications_jobs_ids:
+        job = job_dict[job_id]
+        # get newest notification
+        notification = max(notifications[job.job_id], key=lambda x: x.time_sent)
+        asyncio.create_task(continue_notifications(job, notification))
+        logging.info("Resumed job notifying", extra={"json_fields" : {**log_data, "job_data" : job._asdict()}})
+    logging.info("Resumed all job notifications", extra={"json_fields" : log_data})
 
 async def recover(app):
     asyncio.create_task(recover_jobs())
