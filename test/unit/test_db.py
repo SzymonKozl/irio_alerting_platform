@@ -158,7 +158,7 @@ def test_db_access_get_notification_by_id(postgresql):
     assert notification.notification_num == 2
 
 
-def test_db_access_update_notification_response_status1(postgresql):
+def test_db_access_update_notification_response_status(postgresql):
     setup_db(postgresql)
     insert_example_jobs(postgresql)
 
