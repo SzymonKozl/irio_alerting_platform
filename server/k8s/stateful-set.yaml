@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: alerting-app
+  name: alerting-app
+  namespace: pg-ns
+spec:
+  serviceName: "alerting-app-headless"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: alerting-app
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics_handler"
+        prometheus.io/port: "8080"
+      labels:
+        app: alerting-app
+    spec:
+      containers:
+      - name: alerting-app-container
+        image: gcr.io/<project-id>/alerting-app
+        imagePullPolicy: "Always"
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: gke-pg-cluster-app
+              key: password
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: gke-pg-cluster-app
+              key: username
+        - name: DB_NAME
+          value: "app"
+        - name: DB_HOST
+          value: "gke-pg-cluster-rw.pg-ns"
+        - name: SMTP_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: alerting-app-config
+              key: smtp-user
+        - name: POD_INDEX
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+        - name: SMTP_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: alerting-app-config
+              key: smtp-pass
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: APP_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: alerting-app-config
+              key: external-ip
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 10
+
+  volumeClaimTemplates:
+  - metadata:
+      name: alerting-app-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi

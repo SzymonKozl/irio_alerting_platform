@@ -1,18 +1,18 @@
 import asyncio
 import time
 import smtplib
-import os
-import threading
 from queue import PriorityQueue
 from aiohttp import ClientSession
 from typing import Tuple, Optional
 from email.mime.text import MIMEText
 from datetime import datetime
 import logging
+import threading
 
 
 import db_access
 from common import *
+from counters import *
 
 
 active_jobs_cache = set()
@@ -25,22 +25,7 @@ smtp_port = os.environ.get("SMTP_PORT")
 smtp_port = 587 if not smtp_port else int(smtp_port)
 smtp_username = os.environ.get('SMTP_USERNAME')
 smtp_password = os.environ.get('SMTP_PASSWORD')
-smtp = smtplib.SMTP(smtp_server, smtp_port)
-smtp_lock = threading.Lock()
 
-
-def init_smtp():
-    log_data = {"function_name": "init_smtp"}
-    logging.info("Init SMTP called", extra={"json_fields": log_data})
-    
-    try:
-        smtp.starttls()
-        smtp.login(smtp_username, smtp_password)
-    except Exception as e:
-        logging.error("Error initializing SMTP connection: %s", e,
-                      extra={"json_fields": log_data})
-        raise e
-    logging.info("SMTP connection initialized", extra={"json_fields": log_data})
 
 def send_email(to: str, subject: str, body: str):
     log_data = {"function_name": "send_email", "to": to, "subject": subject}
@@ -51,18 +36,27 @@ def send_email(to: str, subject: str, body: str):
     msg['From'] = smtp_username
     msg['To'] = to
     try:
-        with smtp_lock:
-            smtp.sendmail(smtp_username, to, msg.as_string())
         logging.info("Email sent", extra={"json_fields": log_data})
+        smtp = smtplib.SMTP(smtp_server, smtp_port)
+        try:
+            smtp.starttls()
+            smtp.login(smtp_username, smtp_password)
+        except Exception as e:
+            if os.getenv("DEBUG") is not None:
+                logging.error(e, extra={"json_fields": log_data})
+            else:
+                raise e
+        smtp.sendmail(smtp_username, to, msg.as_string())
     except Exception as e:
         logging.error(f"Error sending email: {e}", extra={"json_fields": log_data})
+        raise e
 
 
 def send_alert(to: str, url: str, notification_id: int, primary_admin: bool):
     log_data = {"function_name": "send_alert", "to": to, "url": url,
                 "notification_id": notification_id, "primary_admin": primary_admin}
     logging.info("Send alert called", extra={"json_fields": log_data})
-    
+
     link = f"http://{APP_HOST}:{APP_PORT}/receive_alert?notification_id={notification_id}&primary_admin={primary_admin}"
     subject = "Alert"
     body = f"Alert for {url}. Click {link} to acknowledge."
@@ -79,11 +73,20 @@ async def pinging_task(job_data: JobData, pod_index: int):
             asyncio.create_task(active_job_updater_task(pod_index))
 
     async def single_request():
+        is_connected = False
         try:
             async with ClientSession() as session:
+                PINGS_SENT_CTR.inc()
+                is_connected = True
+                HTTP_CONNS_ACTIVE_CTR.inc()
                 async with session.get(job_data.url) as response:
+                    if 200 <= response.status < 300:
+                        SUCCESSFUL_PINGS_CTR.inc()
+                    HTTP_CONNS_ACTIVE_CTR.dec()
                     return response
         except:
+            if is_connected:
+                HTTP_CONNS_ACTIVE_CTR.dec()
             return None
 
     futures: PriorityQueue[Tuple[int, asyncio.Task]] = PriorityQueue()
@@ -93,6 +96,7 @@ async def pinging_task(job_data: JobData, pod_index: int):
         with active_jobs_sync_loc:
             if job_data.job_id not in active_jobs_cache:
                 logging.info(f"Found that job with {job_data.job_id} is not active. finishing task.", extra={"json_fields": job_data})
+                JOBS_ACTIVE_CTR.dec()
                 return
 
         task = asyncio.create_task(single_request())
@@ -123,6 +127,7 @@ async def pinging_task(job_data: JobData, pod_index: int):
 
                 try:
                     notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 1, job_data.job_id), conn)
+                    JOBS_ACTIVE_CTR.dec()
 
                     send_alert(job_data.mail1, job_data.url, notification_id, True)
                     db_access.set_job_inactive(job_data.job_id, conn)
@@ -152,6 +157,7 @@ async def pinging_task(job_data: JobData, pod_index: int):
 
 
 async def new_job(job_data: JobData, pod_index: int):
+    JOBS_ACTIVE_CTR.inc()
     await pinging_task(job_data, pod_index)
 
 
@@ -165,13 +171,13 @@ async def continue_notifications(job_data: JobData, notification_data: Notificat
             db_access.set_job_inactive(job_data.job_id, conn)
         finally:
             conn.close()
-    
+
     remaining_response_time = notification_data.time_sent.timestamp() * 1000 + job_data.response_time - time.time_ns() / 1_000_000
 
-    try:    
+    try:
         await asyncio.sleep(max(0, remaining_response_time / 1000))
         conn = db_access.setup_connection(DB_HOST, DB_PORT)
-        
+
         notifications = db_access.get_notifications_for_jobs([job_data.job_id], conn)[job_data.job_id]
         if not any(notification.admin_responded for notification in notifications):
             second_notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 2, job_data.job_id), conn)
@@ -182,7 +188,7 @@ async def continue_notifications(job_data: JobData, notification_data: Notificat
         logging.error("Error while sending a second notification: %s", e, extra={"json_fields": log_data})
     finally:
         conn.close()
-        
+
 
 async def active_job_updater_task(pod_index: int):
     global active_jobs_cache, active_jobs_sync_loc

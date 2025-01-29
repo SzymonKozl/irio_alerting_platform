@@ -1,19 +1,34 @@
+import os
+
 from aiohttp import web
 from aiohttp.web_runner import GracefulExit
 from aiohttp_swagger import setup_swagger
 import asyncio
+from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+from counters import *
+import logging
 import signal
 import os, sys
 import logging
 
 from common import *
 import db_access
-from coroutines import new_job, init_smtp, continue_notifications
+from coroutines import new_job, continue_notifications
 from logging_setup import setup_logging
 
-STATEFUL_SET_INDEX = 1 # todo: set to real value
+STATEFUL_SET_INDEX = int(os.getenv('STATEFUL_SET_INDEX'))
 
 db_conn = db_access.setup_connection(DB_HOST, DB_PORT)
+
+
+async def metrics_handler(request):
+    """Expose Prometheus metrics."""
+    return web.Response(body=generate_latest(), content_type=CONTENT_TYPE_LATEST.rsplit(';', 1)[0])
+
+
+async def health_handler(request):
+    """Health check endpoint."""
+    return web.Response(text="OK", status=200)
 
 
 async def add_service(request: web.Request):
@@ -85,7 +100,7 @@ async def add_service(request: web.Request):
         logging.error("Missing key in request: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
     if not isinstance(period, int) or not isinstance(alerting_window, int) or not isinstance(response_time, int):
-        logging.error("Invalid data type for period, alerting_window or response_time", 
+        logging.error("Invalid data type for period, alerting_window or response_time",
                       extra={"json_fields" : log_data})
         return web.json_response({'error': ERR_MSG_CREATE_POSITIVE_INT}, status=400)
     if period <= 0 or alerting_window <= 0 or response_time <= 0:
@@ -97,13 +112,13 @@ async def add_service(request: web.Request):
     try:
         job_id = db_access.save_job(job_data, db_conn, STATEFUL_SET_INDEX)
     except Exception as e:
-        logging.error("Error saving job to database: %s", e, 
+        logging.error("Error saving job to database: %s", e,
                       extra={"json_fields" : {**log_data, "job_data" : job_data._asdict()}})
         return web.json_response({'error': str(e)}, status=501)
     job_data = JobData(job_id, mail1, mail2, url, period, alerting_window, response_time, True)
     asyncio.create_task(new_job(job_data, STATEFUL_SET_INDEX))
 
-    logging.info("Service added", 
+    logging.info("Service added",
                  extra={"json_fields" : {**log_data, "job_data" : job_data._asdict()}})
     return web.json_response({'success': True, 'job_id': job_id}, status=200)
 
@@ -141,7 +156,7 @@ async def receive_alert(request: web.Request):
     """
     log_data = {"function_name" : "receive_alert"}
     logging.info("Receive alert request received", extra={"json_fields" : log_data})
-    
+
     try:
         notification_id = int(request.query['notification_id'])
         primary_admin = request.query['primary_admin'].lower() == 'true'
@@ -157,7 +172,7 @@ async def receive_alert(request: web.Request):
     try:
         db_access.update_notification_response_status(notification_id, db_conn)
     except Exception as e:
-        logging.error("Error updating alert response status: %s", e, 
+        logging.error("Error updating alert response status: %s", e,
                       extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=500)
 
@@ -246,7 +261,7 @@ async def del_job(request: web.Request):
     except KeyError as e:
         logging.error("Missing key in request: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
-        
+
     log_data["job_id"] = job_id
     try:
         db_access.set_job_inactive(int(job_id), db_conn)
@@ -266,7 +281,7 @@ async def recover_jobs():
     except Exception as e:
         logging.error("Error getting jobs from database: %s", e, extra={"json_fields" : log_data})
         return
-    
+
     job_dict = {job.job_id: job for job in jobs}
 
     active_jobs_ids = [job.job_id for job in jobs if job.is_active]
@@ -311,6 +326,8 @@ app.on_startup.append(recover)
 app.router.add_post('/add_service', add_service)
 app.router.add_get('/receive_alert', receive_alert)
 app.router.add_get('/alerting_jobs', get_alerting_jobs)
+app.router.add_get('/metrics_handler', metrics_handler)
+app.router.add_get('/healthz', health_handler)
 app.router.add_delete('/del_job', del_job)
 setup_swagger(app, swagger_url="/api/doc", title="Alerting Platform API", description="API Documentation")
 
@@ -329,10 +346,4 @@ if __name__ == '__main__':
     except Exception as e:
         logging.warning("Using default logging setup: %s", e)
 
-    try:
-        init_smtp()
-    except Exception as e:
-        logging.error("Error initializing SMTP connection: %s", e,
-                      extra={"json_fields" : {"function_name" : "main"}})
-
-    web.run_app(app, host=APP_HOST, port=APP_PORT)
+    web.run_app(app, host='0.0.0.0', port=APP_PORT)

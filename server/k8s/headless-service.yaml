@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: alerting-app-headless
+  namespace: pg-ns
+spec:
+  clusterIP: None
+  selector:
+    app: alerting-app
+  ports:
+    - port: 8080
+      targetPort: 8080

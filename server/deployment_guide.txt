@@ -1,0 +1,92 @@
+1. Follow this tutorial: https://cloud.google.com/kubernetes-engine/docs/tutorials/stateful-workloads/cloudnativepg until they tell you to make a client pod and connect to the database.
+
+2. Create the client pod and apply the setup sql schema to the app database (they tell you how to connect to this db in the tutorial).
+
+3. Upload the server directory of the alerting app repo and make sure you're in the root directory in the cloudshell.
+
+4. Run:
+
+docker build -t alerting-app -f server/Dockerfile .
+docker tag alerting-app gcr.io/${PROJECT_ID}/alerting-app
+docker push gcr.io/${PROJECT_ID}/alerting-app
+kubectl apply -f server/k8s/load-balancer.yaml
+kubectl apply -f server/k8s/headless-service.yaml
+
+5. Wait for the load balancer (alerting-app-lb) to get an external IP (warning: everything is happening in the pg-ns namespace). 
+
+Basicly run: "kubectl get svc -n pg-ns", until it is not pending. 
+
+6. Configure a configmap by running:
+
+kubectl create configmap alerting-app-config -n pg-ns --from-literal=external-ip=<load-balancer-ext-ip> --from-literal=smtp-user=<alerting-platform-mail> --from-literal=smtp-pass=<alerting-platform-app-password>
+
+7. Edit server/k8s/stateful-set.yaml. There is 1 <project-id> and you need to replace it with your own project id.
+
+8. Run:
+
+kubectl apply -f server/k8s/stateful-set.yaml
+
+MONITORING SETUP
+(tutorial not tested)
+
+9. create namespace
+kubectl create namespace monitoring
+
+10. prometheus install
+install prometheus
+"""
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install prometheus prometheus-community/prometheus -n monitoring
+"""
+11. grafana install
+"""
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+helm install grafana grafana/grafana -n monitoring
+"""
+
+12. grafana load balancer:
+type
+kubectl edit svc grafana -n monitoring
+and edit "type: ClusterIP" to "type: LoadBalancer"
+
+13. get grafana password
+
+kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+14. type
+kubectl get svc -n monitoring
+to get external ip of grafana
+
+15. login into grafana under external ip address using uname 'admin' and password fetched in step 13.
+
+16. go to connections>data sources tab and add new prometheus data source
+The only thing you need to modify is the prometheus URL. insert "http://prometheus-server.monitoring.svc.cluster.local:80"
+
+17. go to the 'dashboards' tab > new > import > use json files from server/monitoring/grafana_dashboards to configure dashboards
+note: i am not sure whether this step will work
+
+18. mail setup for grafana alerts:
+a) create secret with smtp credentials
+for simplicity I used our mail for sending normal alerts
+kubectl create secret -n monitoring generic notifications-smtp  --from-literal=user=<our alerting platform mail>  --from-literal=<secret password> --from-literal=host=smtp.gma
+il.com:587
+
+b) in server/k8s/grafana-deployment-patch.yaml insert your mail address under GF_SMTP_FROM_ADDRESS variable
+
+b) apply patch to grafana deployment
+kubectl patch -n monitoring deployment grafana --patch-file server/k8s/grafana-deployment-patch.yaml
+
+c) in grafana, go to the Alerting>contact points tab and create contact point with your email
+
+19. Alert setup
+
+Go to Alerting>new alert and configure alert with:
+query: count(kube_pod_info{created_by_name="alerting-app"})
+leave one expression: Threshold for input, below 3
+in "3. Set evaluation behavior" section: insert random values, it should work anyway. two values are important:
+"Pending period" should be ~2min
+"Evaluation interval" for evaluation group should be 10s
+Add your contact point defined in 18.c).
+Add alert message, for example "stanął w ogniu nasz wielki dom"
