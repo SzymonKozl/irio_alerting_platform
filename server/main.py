@@ -272,13 +272,6 @@ async def recover_jobs():
     active_jobs_ids = [job.job_id for job in jobs if job.is_active]
     inactive_jobs_ids = [job.job_id for job in jobs if not job.is_active]
 
-    # active_jobs, inactive_jobs_ids = [], []
-    # for job in jobs:
-    #   if job.is_active:
-    #     active_jobs.append(job)
-    #   else:
-    #     inactive_jobs_ids.append(job.job_id)
-
     try:
       notifications = db_access.get_notifications_for_jobs(inactive_jobs_ids, db_conn)
     except Exception as e:
@@ -295,34 +288,6 @@ async def recover_jobs():
       )
     ]
 
-    # active_jobs = []
-
-    # for job in inactive_jobs:
-    #   if notifications[job.job_id]:
-    #     # get newest notification
-    #     notification = max(notifications[job.job_id], key=lambda x: x.time_sent)
-    #     if notification.notification_num == 1 and not notification.admin_responded:
-    #       pending_notifications_jobs.append(job)
-
-    # # inactive jobs
-    # for job in 
-
-    # for job, notifications in notifications.items():
-    #     if notifications:
-    #         notification = max(notifications, key=lambda x: x.time_sent)
-    #         if notification.notification_num == 1 and not notification.admin_responded:
-    #             pending_notifications_jobs.append(job)
-
-
-    # for job in jobs:
-    #     if (len(notifications[job.job_id]) == 1 and
-    #         notifications[job.job_id][0].notification_num == 1 and
-    #         not notifications[job.job_id][0].admin_responded):
-    #           pending_notifications_jobs.append(job)
-    #     elif job.is_active:
-    #         # Previous check is needed, because the pod might crash 
-    #         # after saving the first notification and before setting the job as inactive
-    #         active_jobs.append(job)
     for job_id in active_jobs_ids:
         job = job_dict[job_id]
         asyncio.create_task(new_job(job, STATEFUL_SET_INDEX))
