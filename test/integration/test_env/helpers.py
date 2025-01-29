@@ -74,7 +74,7 @@ def clear_db():
         )
 
         cursor = conn.cursor()
-        setup_file = "../../server/db_migrations/V1__setup.sql"
+        setup_file = "../../server/db_migrations/V2__setup.sql"
         with open(setup_file, 'r') as file:
             sql_script = file.read()
         cursor.execute(sql_script)
