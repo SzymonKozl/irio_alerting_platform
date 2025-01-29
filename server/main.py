@@ -13,7 +13,7 @@ import logging
 
 from common import *
 import db_access
-from coroutines import new_job, init_smtp, continue_notifications
+from coroutines import new_job, continue_notifications
 from logging_setup import setup_logging
 
 STATEFUL_SET_INDEX = int(os.getenv('STATEFUL_SET_INDEX'))

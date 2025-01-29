@@ -7,6 +7,7 @@ from typing import Tuple, Optional
 from email.mime.text import MIMEText
 from datetime import datetime
 import logging
+import threading
 
 
 import db_access
@@ -118,7 +119,7 @@ async def pinging_task(job_data: JobData, pod_index: int):
                 conn = db_access.setup_connection(DB_HOST, DB_PORT)
 
                 try:
-                    notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, False), conn)
+                    notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 1, job_data.job_id), conn)
                     JOBS_ACTIVE_CTR.dec()
 
                     send_alert(job_data.mail1, job_data.url, notification_id, True)
