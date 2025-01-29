@@ -1,8 +1,9 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: flyway-migrations
+  name: flyway-baseline
 spec:
+  ttlSecondsAfterFinished: 0
   template:
     spec:
       containers:
