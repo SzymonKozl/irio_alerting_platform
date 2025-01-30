@@ -110,7 +110,7 @@ def test_recovery():
         signal.signal(signal.SIGCHLD, lambda signum, frame: None)
         alert_service.close()
         sleep(1)
-        orig = signal.signal(signal.SIGCHLD, handle_child_death)
+        signal.signal(signal.SIGCHLD, handle_child_death)
         alert_service = AlertingServiceHandle(LOGS_DIR)
 
         mock_service.respond_404()
