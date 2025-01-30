@@ -143,11 +143,9 @@ async def pinging_task(job_data: JobData, pod_index: int):
                         second_notification_id = db_access.save_notification(NotificationData(-1, datetime.now(), False, 2, job_data.job_id), conn)
                         send_alert(job_data.mail2, job_data.url, second_notification_id)
 
-                        await asyncio.sleep(job_data.response_time / 1000)
-
-                        # Check if the secondary admin has responded and log the result
                 finally:
                     conn.close()
+
                 return
 
         delay = time.time_ns() - delay_start
