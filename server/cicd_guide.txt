@@ -1,0 +1,7 @@
+Look through the deployment workflow and add all the necessary secrets.
+To obtain GCP_SA_KEY you will need to create a service account in gcp.
+I used the GUI to create a service account and download its key and then ran the following to give it necessary permissions:
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:YOUR_SA_ID@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/container.developer"
