@@ -1,9 +1,6 @@
-name: Unit Tests
+name: Run Unit Tests on Pull Request to Dev
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
