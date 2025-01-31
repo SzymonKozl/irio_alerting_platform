@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: flyway-migrations
 spec:
-  ttlSecondsAfterFinished: 0
+  ttlSecondsAfterFinished: 5
   template:
     spec:
       containers:

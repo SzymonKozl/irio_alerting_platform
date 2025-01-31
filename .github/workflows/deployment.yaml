@@ -31,6 +31,11 @@ jobs:
       run: |
         gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER_NAME }} --zone ${{ secrets.GKE_ZONE }}
 
+    - name: apply migrations to the database
+      run: |
+        kubectl apply -f server/k8s/flyway_migrate_job.yaml -n pg-ns
+        kubectl wait --timeout=30s --for=condition=Complete -f server/k8s/flyway_migrate_job.yaml  -n pg-ns
+
     - name: Log in to Docker Hub
       uses: docker/login-action@v2
       with:
