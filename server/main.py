@@ -283,7 +283,7 @@ async def hello(request: web.Request):
                   type: string
                   example: "Hello, World!"
     """
-    return web.json_response({"message": "Hello, World!"})
+    return web.json_response({"message": "Dziekan całka sesja"})
 
 
 async def recover_jobs():
