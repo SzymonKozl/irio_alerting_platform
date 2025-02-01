@@ -49,4 +49,4 @@ jobs:
 
     - name: Deploy to Kubernetes
       run: |
-        kubectl apply -f server/k8s/stateful-set.yaml -n pg-ns
+        kubectl rollout restart statefulset/alerting-app -n pg-ns
