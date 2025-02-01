@@ -79,7 +79,7 @@ async def test_add_service_non_positive_values(aiohttp_client):
 
 @pytest.mark.asyncio
 async def test_receive_alert_success(aiohttp_client):
-    with patch("main.db_access.update_notification_response_status", return_value=None):
+    with patch("main.db_access.update_notification_response_status", return_value=True):
         test_client = await aiohttp_client(setup_app())
 
         params = {"notification_id": "42"}
