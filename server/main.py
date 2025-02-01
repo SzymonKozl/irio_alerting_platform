@@ -163,7 +163,9 @@ async def receive_alert(request: web.Request):
 
     log_data.update({"notification_id": notification_id})
     try:
-        db_access.update_notification_response_status(notification_id, db_conn)
+        if not db_access.update_notification_response_status(notification_id, db_conn):
+            logging.info(f"Tried to update notification with {notification_id} ID, no changes to db were made", extra={"json_fields" : log_data})
+            return web.json_response({'error': "Alert already acknowledged or does not exist"}, status=400)
     except Exception as e:
         logging.error("Error updating alert response status: %s", e,
                       extra={"json_fields" : log_data})

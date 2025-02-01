@@ -91,7 +91,12 @@ def get_notification_by_id(notification_id: int, conn: psycopg2.extensions.conne
     return NotificationData(*cursor.fetchone())
 
 
-def update_notification_response_status(notification_id: int, conn: psycopg2.extensions.connection) -> None:
+def update_notification_response_status(notification_id: int, conn: psycopg2.extensions.connection) -> bool:
+    """
+    :param notification_id:
+    :param conn:
+    :return: true if updated single row with given notification_id
+    """
     cursor = conn.cursor()
 
     cursor.execute(
@@ -101,7 +106,10 @@ def update_notification_response_status(notification_id: int, conn: psycopg2.ext
         (notification_id,)
     )
 
+    rowcount = cursor.rowcount
+
     conn.commit()
+    return rowcount == 1
 
 
 def get_active_job_ids(conn: psycopg2.extensions.connection, pod_index: int) -> Set[job_id_t]:
