@@ -49,4 +49,6 @@ jobs:
 
     - name: Deploy to Kubernetes
       run: |
-        kubectl rollout restart statefulset/alerting-app -n pg-ns --image ${{ secrets.DOCKER_USERNAME }}/alerting-platform:$(git rev-parse --short HEAD)
+        kubectl patch statefulset alerting-app -n pg-ns --type='strategic' \
+          -p "{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"alerting-app-container\", \"image\": \"alertingplatform/alerting-platform:$(git rev-parse --short HEAD)\"}]}}}}"
+
