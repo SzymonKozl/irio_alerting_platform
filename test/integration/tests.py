@@ -96,6 +96,37 @@ def test_deleting_job():
         clear_db()
 
 
+def test_recovery():
+    orig = signal.signal(signal.SIGCHLD, handle_child_death)
+    mail_server = MailServer(port=1025)
+    sleep(2)
+    alert_service = AlertingServiceHandle(LOGS_DIR)
+    mock_service = MockServiceHandle(7000, LOGS_DIR)
+    try:
+        sleep(5)
+        new_job = PingingJob("dziekan@localhost", "student@localhost", 100, mock_service, 1000, 1000)
+        alert_service.add_pinging_job(new_job)
+
+        signal.signal(signal.SIGCHLD, lambda signum, frame: None)
+        alert_service.close()
+        sleep(1)
+        signal.signal(signal.SIGCHLD, handle_child_death)
+        alert_service = AlertingServiceHandle(LOGS_DIR)
+
+        mock_service.respond_404()
+        sleep(3)
+        assert mail_server.last_mail_to("dziekan@localhost") is not None
+        sleep(1)
+        assert mail_server.last_mail_to("student@localhost") is not None
+
+    finally:
+        signal.signal(signal.SIGCHLD, orig)
+        mail_server.stop()
+        mock_service.close()
+        alert_service.close()
+        clear_db()
+
+
 if __name__ == '__main__':
 
     test_sending_alert()
@@ -103,4 +134,6 @@ if __name__ == '__main__':
     test_normal_behavior()
     sleep(0.5)
     test_deleting_job()
+    sleep(0.5)
+    test_recovery()
     exit(0)

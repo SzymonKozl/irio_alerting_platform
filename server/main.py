@@ -138,12 +138,6 @@ async def receive_alert(request: web.Request):
         type: integer
         description: ID of the received notification.
         example: 0
-      - in: query
-        name: primary_admin
-        required: true
-        type: boolean
-        description: Received by the primary admin.
-        example: true
     responses:
       "200":
         description: Successful response
@@ -159,7 +153,6 @@ async def receive_alert(request: web.Request):
 
     try:
         notification_id = int(request.query['notification_id'])
-        primary_admin = request.query['primary_admin'].lower() == 'true'
     except KeyError as e:
         logging.error("Missing key in request: %s", e, extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
@@ -168,7 +161,7 @@ async def receive_alert(request: web.Request):
                       extra={"json_fields" : log_data})
         return web.json_response({'error': str(e)}, status=400)
 
-    log_data.update({"notification_id": notification_id, "primary_admin": primary_admin})
+    log_data.update({"notification_id": notification_id})
     try:
         db_access.update_notification_response_status(notification_id, db_conn)
     except Exception as e:
@@ -183,7 +176,7 @@ async def receive_alert(request: web.Request):
 async def get_alerting_jobs(request: web.Request):
     """
     ---
-    description: Returns IDs of alerting job with a specified primary administrator's email.
+    description: Returns data of alerting jobs with a specified primary administrator's email.
     tags:
       - Service Monitoring
     produces:
