@@ -44,9 +44,9 @@ jobs:
 
     - name: Build and Push Docker Image
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/alerting-platform:$(git rev-parse --short HEAD)" -f server/Dockerfile .
-        docker push ${{ secrets.DOCKER_USERNAME }}/alerting-platform:$(git rev-parse --short HEAD)"
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/alerting-platform:$(git rev-parse --short HEAD) -f server/Dockerfile .
+        docker push ${{ secrets.DOCKER_USERNAME }}/alerting-platform:$(git rev-parse --short HEAD)
 
     - name: Deploy to Kubernetes
       run: |
-        kubectl rollout restart statefulset/alerting-app -n pg-ns --image ${{ secrets.DOCKER_USERNAME }}/alerting-platform:$(git rev-parse --short HEAD)"
+        kubectl rollout restart statefulset/alerting-app -n pg-ns --image ${{ secrets.DOCKER_USERNAME }}/alerting-platform:$(git rev-parse --short HEAD)
