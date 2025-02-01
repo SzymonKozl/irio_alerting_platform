@@ -1,6 +1,12 @@
 1. Follow this tutorial: https://cloud.google.com/kubernetes-engine/docs/tutorials/stateful-workloads/cloudnativepg until they tell you to make a client pod and connect to the database.
 
-2. Create the client pod and apply the setup sql schema to the app database (they tell you how to connect to this db in the tutorial).
+
+2.1 create flyway config
+kubectl create configmap flyway-conf -n pg-ns --from-file=flyway/flyway.conf
+2.2 run flyway baseline job
+kubectl apply -n pg-ns -f server/k8s/flyway_baseline_job.yaml
+2.3 wait until completion and apply migrations by
+kubectl apply -n pg-ns -f server/k8s/flyway_migrate_job.yaml
 
 3. Upload the server directory of the alerting app repo and make sure you're in the root directory in the cloudshell.
 
@@ -20,12 +26,6 @@ Basicly run: "kubectl get svc -n pg-ns", until it is not pending.
 
 kubectl create configmap alerting-app-config -n pg-ns --from-literal=external-ip=<load-balancer-ext-ip> --from-literal=smtp-user=<alerting-platform-mail> --from-literal=smtp-pass=<alerting-platform-app-password>
 
-6.5 create flyway config
-kubectl create configmap flyway-conf -n pg-ns --from-file=flyway/flyway.conf
-6.75 run flyway baseline job
-kubectl apply -n pg-ns -f server/k8s/flyway_baseline_job.yaml
-6.875 wait until completion and apply migrations by
-kubectl apply -n pg-ns -f server/k8s/flyway_migrate_job.yaml
 
 7. Edit server/k8s/stateful-set.yaml. There is 1 <project-id> and you need to replace it with your own project id.
 
@@ -34,7 +34,6 @@ kubectl apply -n pg-ns -f server/k8s/flyway_migrate_job.yaml
 kubectl apply -f server/k8s/stateful-set.yaml
 
 MONITORING SETUP
-(tutorial not tested)
 
 9. create namespace
 kubectl create namespace monitoring
