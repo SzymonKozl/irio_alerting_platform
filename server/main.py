@@ -272,6 +272,25 @@ async def del_job(request: web.Request):
     return web.json_response({'success': True}, status=200)
 
 
+async def hello(request: web.Request):
+    """
+    ---
+    description: Returns a simple Hello, World! message.
+    responses:
+      200:
+        description: Successful response
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: "Hello, World!"
+    """
+    return web.json_response({"message": "Hello, World!"})
+
+
 async def recover_jobs():
     log_data = {"function_name" : "recover_jobs"}
     logging.info("Recovering jobs", extra={"json_fields" : log_data})
@@ -329,6 +348,7 @@ app.router.add_get('/alerting_jobs', get_alerting_jobs)
 app.router.add_get('/metrics_handler', metrics_handler)
 app.router.add_get('/healthz', health_handler)
 app.router.add_delete('/del_job', del_job)
+app.router.add_get('/hello', hello)
 setup_swagger(app, swagger_url="/api/doc", title="Alerting Platform API", description="API Documentation")
 
 
